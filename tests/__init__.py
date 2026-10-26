@@ -1,0 +1,1 @@
+"""GhostTrace test suite."""
