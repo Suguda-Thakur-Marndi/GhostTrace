@@ -38,8 +38,15 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--offline",
+        "--no-ai",
         action="store_true",
+        dest="offline",
         help="Run in offline deterministic mode (uses Spectral Echoes fallback, bypasses Ollama).",
+    )
+    parser.add_argument(
+        "--no-animation",
+        action="store_true",
+        help="Disable startup delays and animations for accessibility and automated testing.",
     )
     parser.add_argument(
         "--host",
@@ -51,7 +58,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         "--timeout",
         type=float,
         default=None,
-        help="Model inference timeout in seconds (default: 5.0).",
+        help="Model inference timeout in seconds (default: 15.0).",
     )
     parser.add_argument(
         "--check-health",
@@ -71,6 +78,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         version=f"GhostTrace AI v{__version__}",
     )
     return parser.parse_args(args)
+
 
 
 def run_health_check(config: GhostConfig) -> int:
@@ -124,10 +132,13 @@ def main(args: Optional[list[str]] = None) -> int:
         config.personality = parsed.personality
     if parsed.offline:
         config.offline_only = True
+    if parsed.no_animation:
+        config.animations_enabled = False
     if parsed.host:
         config.ollama_url = parsed.host
     if parsed.timeout:
         config.timeout_seconds = parsed.timeout
+
 
     if parsed.check_health:
         return run_health_check(config)

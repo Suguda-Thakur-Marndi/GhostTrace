@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+import random
 import sys
+import time
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from rich import box
 from rich.console import Console
@@ -14,16 +16,16 @@ from rich.table import Table
 from rich.text import Text
 
 from ghosttrace.command_runner import CommandRunner
-from ghosttrace.config import PERSONALITIES, GhostConfig
-from ghosttrace.ghost import GhostEngine
+from ghosttrace.config import PERSONALITIES, STARTUP_MESSAGES, GhostConfig
+from ghosttrace.ghost import GhostEngine, GhostWhisper
 from ghosttrace.ollama_client import OllamaClient
-from ghosttrace.safety import RiskLevel, SafetyEngine
+from ghosttrace.safety import RiskLevel, SafetyEngine, SafetyReport
 
 ASCII_BANNER = r"""
        .-.
-      (o.o)   [bold magenta]G H O S T T R A C E   A I[/bold magenta]
-       |=|    [dim cyan]─────────────────────────────────────────────────[/dim cyan]
-      /   \   [italic green]"The Shell Remembers. Every keystroke leaves an echo."[/italic green]
+      (o.o)   [bold green]G H O S T T R A C E   A I[/bold green]
+       |=|    [dim]─────────────────────────────────────────────────[/dim]
+      /   \   [bold green]GHOSTTRACE AI — THE SHELL REMEMBERS[/bold green]
      (:   :)  [dim]Local AI Engine • Privacy-First • Zero Cloud Telemetry[/dim]
       `"`"`
 """
@@ -46,9 +48,23 @@ class HauntedShell:
         self.runner = CommandRunner(timeout=15.0)
         self.is_running = False
 
+    def get_rotating_messages(self, count: int = 3) -> List[str]:
+        """Select rotating atmospheric ghost messages for startup."""
+        if len(STARTUP_MESSAGES) >= count:
+            return random.sample(STARTUP_MESSAGES, count)
+        return STARTUP_MESSAGES[:count]
+
     def print_banner(self) -> None:
-        """Render the startup haunted sigil and environmental status."""
+        """Render the startup haunted sigil, rotating ghost messages, and environmental status."""
         self.console.print(ASCII_BANNER)
+
+        # Rotating ghost messages
+        messages = self.get_rotating_messages(3)
+        for msg in messages:
+            if self.config.animations_enabled:
+                time.sleep(0.04)
+            self.console.print(f" [dim green]•[/dim green] [italic dim]{msg}[/italic dim]")
+        self.console.print()
 
         # Elevation warning if running as root/admin
         if self.safety.is_elevated():
@@ -63,13 +79,19 @@ class HauntedShell:
 
         # Quick startup status line
         model_name = self.config.model
+        is_alive = self.client.is_available()
+        daemon_status = "[bold green]ONLINE[/bold green]" if is_alive else "[bold red]OFFLINE (Fallback)[/bold red]"
         persona = PERSONALITIES.get(self.config.personality, {}).get("title", self.config.personality)
+
         self.console.print(
-            f" [dim]Spirit Guide:[/dim] [bold magenta]{persona}[/bold magenta] | "
-            f"[dim]Neural Core:[/dim] [bold cyan]{model_name}[/bold cyan] | "
+            f" [dim]Neural Core:[/dim] [bold green]{model_name}[/bold green] | "
+            f"[dim]Daemon:[/dim] {daemon_status} | "
+            f"[dim]Spirit Persona:[/dim] [bold green]{persona}[/bold green] | "
             f"[dim]Wards:[/dim] [bold green]{'STRICT' if self.config.safe_mode else 'LENIENT'}[/bold green]"
         )
-        self.console.print(" [dim]Type [bold white]'help'[/bold white] for the Grimoire or [bold white]'exit'[/bold white] to unbind the spirit.\n[/dim]")
+        self.console.print(
+            " [dim]Type [bold white]'help'[/bold white] for the Grimoire or [bold white]'exit'[/bold white] to unbind the spirit.\n[/dim]"
+        )
 
     def run(self) -> None:
         """Run the main interactive REPL loop."""
@@ -78,10 +100,10 @@ class HauntedShell:
 
         while self.is_running:
             try:
-                # Custom ghost prompt showing current directory
+                # Custom ghost prompt showing current directory in restrained phosphor green and muted gray
                 cwd_name = Path(os.getcwd()).name or os.getcwd()
-                prompt_text = f"[bold green]ghost[/bold green][dim]@[/dim][bold cyan]machine[/bold cyan]:[bold magenta]{cwd_name}[/bold magenta][dim] 👻❯[/dim] "
-                
+                prompt_text = f"[bold green]ghost[/bold green][dim]@[/dim][bold green]machine[/bold green]:[dim]{cwd_name}[/dim][bold green] 👻❯[/bold green] "
+
                 # Use console.input for rich prompt display
                 user_input = self.console.input(prompt_text).strip()
 
@@ -90,7 +112,10 @@ class HauntedShell:
 
                 self.handle_input(user_input)
 
-            except (KeyboardInterrupt, EOFError):
+            except KeyboardInterrupt:
+                self.console.print("\n[dim italic]^C (Interrupt) The spirit holds the line... prompt reset.[/dim italic]")
+                continue
+            except EOFError:
                 self.console.print("\n[dim italic]The ghost retreats into the static... session terminated.[/dim italic]")
                 self.is_running = False
                 break
@@ -126,9 +151,9 @@ class HauntedShell:
         """Leave the haunted terminal."""
         self.console.print(
             Panel(
-                "[italic magenta]\"You close the terminal portal, but the memory lingers in the machine's silicon... farewell.\"[/italic magenta]",
+                "[italic green]\"You close the terminal portal, but the memory lingers in the machine's silicon... farewell.\"[/italic green]",
                 title="[dim]Departing Whisper[/dim]",
-                border_style="magenta",
+                border_style="green",
                 box=box.ROUNDED,
             )
         )
@@ -141,14 +166,14 @@ class HauntedShell:
 
     def cmd_help(self) -> None:
         """Display the haunted terminal grimoire."""
-        table = Table(title="[bold magenta]GHOSTTRACE AI — THE GRIMOIRE[/bold magenta]", box=box.ROUNDED)
-        table.add_column("Command", style="cyan bold", width=20)
+        table = Table(title="[bold green]GHOSTTRACE AI — THE GRIMOIRE[/bold green]", box=box.ROUNDED)
+        table.add_column("Command", style="green bold", width=22)
         table.add_column("Description", style="white")
 
         table.add_row("help", "Display this arcane grimoire of commands")
         table.add_row("status", "Inspect Ollama connection, neural model, wards, and environment")
-        table.add_row("model [name]", "View or switch local Ollama neural model (e.g., qwen2.5:1.5b)")
-        table.add_row("personality [name]", "View or switch spirit persona (spectral_wraith, cyber_poltergeist, crypt_keeper)")
+        table.add_row("model [name]", "View or switch local Ollama neural model (e.g., gemma3:4b)")
+        table.add_row("personality [name]", "View or switch spirit persona (ghosttrace, spectral_wraith, cyber_poltergeist, crypt_keeper)")
         table.add_row("explain <cmd>", "Analyze risk and technical purpose without executing")
         table.add_row("clear", "Cleanse the terminal altar and restore the sigil")
         table.add_row("exit / quit", "Sever the neural conduit and exit the terminal")
@@ -170,7 +195,7 @@ class HauntedShell:
             except Exception:
                 models = []
 
-        table = Table(title="[bold cyan]GHOSTTRACE SYSTEM SANCTUM[/bold cyan]", box=box.ROUNDED)
+        table = Table(title="[bold green]GHOSTTRACE SYSTEM SANCTUM[/bold green]", box=box.ROUNDED)
         table.add_column("Property", style="bold green", width=24)
         table.add_column("Current State", style="white")
 
@@ -180,9 +205,10 @@ class HauntedShell:
             if is_ollama_alive
             else "[bold red]OFFLINE (Using Spectral Echoes fallback)[/bold red]",
         )
-        table.add_row("Active Model", f"[bold cyan]{self.config.model}[/bold cyan]")
+        table.add_row("Active Model", f"[bold green]{self.config.model}[/bold green]")
         table.add_row("Available Models", ", ".join(models) if models else "[dim]None discovered[/dim]")
         table.add_row("Inference Timeout", f"{self.config.timeout_seconds} seconds")
+        table.add_row("Animations", "[bold green]ENABLED[/bold green]" if self.config.animations_enabled else "[dim]DISABLED[/dim]")
         table.add_row("Persona Style", self.config.personality)
         table.add_row("Safety Ward (Safe Mode)", "[bold green]ACTIVE (Strict Allowlist)[/bold green]" if self.config.safe_mode else "[bold yellow]INACTIVE[/bold yellow]")
         table.add_row("Privilege Level", "[bold red]ADMINISTRATOR / ROOT[/bold red]" if self.safety.is_elevated() else "[bold green]STANDARD USER (Safe)[/bold green]")
@@ -193,10 +219,9 @@ class HauntedShell:
     def cmd_model(self, model_name: str) -> None:
         """List or switch the active LLM."""
         if not model_name:
-            # List models
             try:
                 available = self.client.list_models()
-                self.console.print(f"[dim]Active model:[/dim] [bold cyan]{self.config.model}[/bold cyan]")
+                self.console.print(f"[dim]Active model:[/dim] [bold green]{self.config.model}[/bold green]")
                 self.console.print(f"[dim]Available local models:[/dim] {', '.join(available) or 'None'}")
                 self.console.print("[dim]To switch, run: model <model_name>[/dim]")
             except Exception as err:
@@ -207,15 +232,15 @@ class HauntedShell:
         self.config.model = target
         self.ghost.config.model = target
         self.client.default_model = target
-        self.console.print(f"[bold green]Neural core shifted to:[/bold green] [bold cyan]{target}[/bold cyan]")
+        self.console.print(f"[bold green]Neural core shifted to:[/bold green] [bold green]{target}[/bold green]")
 
     def cmd_personality(self, persona_key: str) -> None:
         """List or switch the spirit persona."""
         if not persona_key:
-            self.console.print("[bold magenta]Available Spirit Personas:[/bold magenta]")
+            self.console.print("[bold green]Available Spirit Personas:[/bold green]")
             for key, val in PERSONALITIES.items():
                 mark = " [bold green]➔ (active)[/bold green]" if key == self.config.personality else ""
-                self.console.print(f"  • [bold cyan]{key}[/bold cyan]: {val['title']} — [dim]{val['description']}[/dim]{mark}")
+                self.console.print(f"  • [bold green]{key}[/bold green]: {val['title']} — [dim]{val['description']}[/dim]{mark}")
             self.console.print("[dim]To switch, run: personality <key>[/dim]")
             return
 
@@ -223,7 +248,7 @@ class HauntedShell:
         if key in PERSONALITIES:
             self.config.personality = key
             self.ghost.config.personality = key
-            self.console.print(f"[bold green]The ghost's essence transforms into:[/bold green] [bold magenta]{PERSONALITIES[key]['title']}[/bold magenta]")
+            self.console.print(f"[bold green]The ghost's essence transforms into:[/bold green] [bold green]{PERSONALITIES[key]['title']}[/bold green]")
         else:
             self.console.print(f"[bold red]Unknown persona '{key}'. Available: {', '.join(PERSONALITIES.keys())}[/bold red]")
 
@@ -283,33 +308,35 @@ class HauntedShell:
         self._render_execution_result(result)
 
     def _render_technical_analysis(self, report: SafetyReport) -> None:
-        """Render technical explanation and risk classification panel."""
-        risk_colors = {
-            RiskLevel.SAFE: "green",
-            RiskLevel.SENSITIVE: "yellow",
-            RiskLevel.BLOCKED: "red",
-            RiskLevel.MALFORMED: "dark_orange",
+        """Render technical explanation and risk classification panel with distinct visual styles."""
+        risk_styles = {
+            RiskLevel.SAFE: ("green", "SAFE", "[dim]Standard safe execution approved.[/dim]"),
+            RiskLevel.SENSITIVE: ("yellow", "CAUTION / SENSITIVE", "[bold yellow]Action modifies state or executes custom code.[/bold yellow]"),
+            RiskLevel.BLOCKED: ("red", "BLOCKED", "[bold red]Prohibited by safety wards.[/bold red]"),
+            RiskLevel.MALFORMED: ("red", "MALFORMED", "[bold red]Invalid or malformed command syntax.[/bold red]"),
         }
-        color = risk_colors.get(report.risk_level, "white")
+        color, badge, status_note = risk_styles.get(
+            report.risk_level, ("white", report.risk_level.value, "")
+        )
 
         body = (
-            f"[bold {color}]Risk Level: {report.risk_level.value}[/bold {color}]  [dim]•[/dim]  "
+            f"[bold {color}]Risk Level: {badge}[/bold {color}]  [dim]•[/dim]  {status_note}\n"
             f"[dim]Evaluation:[/dim] {report.reason}\n"
-            f"[bold white]Action:[/bold white] {report.explanation}"
+            f"[bold white]Technical Action:[/bold white] {report.explanation}"
         )
         self.console.print(
             Panel(
                 body,
-                title="[dim cyan]Technical Command Analysis[/dim cyan]",
+                title=f"[dim]Technical Command Analysis[/dim] [dim]•[/dim] [{color}]{badge}[/{color}]",
                 border_style=color,
                 box=box.ROUNDED,
             )
         )
 
     def _render_ghost_whisper(self, whisper: GhostWhisper) -> None:
-        """Render spectral commentary panel."""
+        """Render spectral commentary panel with restrained phosphor-green and muted gray styling."""
         source_badge = (
-            f"[bold cyan]Ollama ({whisper.model})[/bold cyan]"
+            f"[bold green]Ollama ({whisper.model})[/bold green]"
             if whisper.source == "ollama"
             else "[dim yellow]Spectral Echo (Offline/Fallback)[/dim yellow]"
         )
@@ -319,24 +346,23 @@ class HauntedShell:
 
         if whisper.commentary and whisper.explanation:
             body_parts = [
-                f"[bold magenta]Ghost Commentary:[/bold magenta] [italic]\"{whisper.commentary}\"[/italic]",
-                f"[bold cyan]Technical Explanation:[/bold cyan] {whisper.explanation}",
+                f"[bold green]Ghost Commentary:[/bold green] [italic]\"{whisper.commentary}\"[/italic]",
+                f"[dim]Technical Explanation:[/dim] {whisper.explanation}",
             ]
             if whisper.risk_warning and whisper.risk_warning.lower() != "none":
-                body_parts.append(f"[bold yellow]Risk Warning:[/bold yellow] {whisper.risk_warning}")
+                body_parts.append(f"[bold red]Risk Warning:[/bold red] {whisper.risk_warning}")
             content = "\n".join(body_parts) + notice
         else:
-            content = f"[italic magenta]\"{whisper.text}\"[/italic magenta]{notice}"
+            content = f"[italic green]\"{whisper.text}\"[/italic green]{notice}"
 
         self.console.print(
             Panel(
                 content,
                 title=f"[bold green]👻 GhostTrace AI[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}",
-                border_style="magenta",
+                border_style="green",
                 box=box.ROUNDED,
             )
         )
-
 
     def _render_execution_result(self, result: CommandRunner.ExecutionResult) -> None:
         """Render command execution outcome."""

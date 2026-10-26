@@ -42,6 +42,15 @@ PERSONALITIES: Dict[str, Dict[str, str]] = {
     },
 }
 
+STARTUP_MESSAGES: List[str] = [
+    "The shell remembers every keystroke etched in the dark.",
+    "Dead processes whisper from the graveyard of swap space.",
+    "A cold draft stirs within the terminal registers.",
+    "Your commands leave lingering footprints in the machine.",
+    "Deep in the CPU cache, an ancient presence stirs and listens.",
+    "An unearthly hum pulses through the silicon pathways.",
+]
+
 DEFAULT_MODEL = "gemma3:4b"
 FALLBACK_MODEL = "gemma3:4b"
 DEFAULT_HOST = "http://localhost:11434"
@@ -60,8 +69,10 @@ class GhostConfig:
     safe_mode: bool = True
     require_confirmation: bool = True
     offline_only: bool = False
+    animations_enabled: bool = True
     theme: str = "gothic_dark"
     max_tokens: int = 150
+
 
     allowed_commands: List[str] = field(
         default_factory=lambda: [

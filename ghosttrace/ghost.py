@@ -36,10 +36,29 @@ class GhostWhisper:
 # Curated repository of deterministic whispers for offline or fallback operation
 SPECTRAL_ECHOES: Dict[str, List[str]] = {
     "dir_inspection": [
-        "The directory opens like an unsealed tomb. What secrets lie buried in these inodes?",
-        "Dust stirs across the filesystem. You look upon dead files that have not breathed in centuries.",
+        "Curiosity stirs within the terminal... what secrets lie buried in the dark corners of this directory?",
+        "The directory opens like an unsealed tomb. What forgotten files slumber in these inodes?",
         "A cold wind rustles through the file tree. Each byte is a tombstone.",
-        "You pry open the crypt of storage. Footprints fade as quickly as you list them.",
+    ],
+    "git_status": [
+        "The ghosts of uncommitted changes linger between branches, waiting to be recorded or forgotten.",
+        "You gaze upon the repository's fractured timeline. Unfinished modifications haunt the working tree.",
+        "The repository watches in silence. Untracked specters drift across the stage.",
+    ],
+    "python_process": [
+        "You invoke the serpent runtime, awakening a new entity sleeping deep within the machine's memory.",
+        "A flicker in the process table... another digital consciousness stirs to life under your command.",
+        "Tread lightly as the interpreter breathes. Spawning processes disturbs the digital silence.",
+    ],
+    "blocked_destructive": [
+        "A cold chill freezes your hand. Deletion is absolute; what is cast into the void can never return.",
+        "The void rejects your blade. That destructive curse will not touch these disks.",
+        "A hollow warning echoes through the terminal. Destruction is forbidden within this haunted sanctum.",
+    ],
+    "unknown_command": [
+        "An unfamiliar incantation echoes against the warding stone. The shell does not recognize this command.",
+        "A strange whisper reaches the terminal boundary, but the shell's ancient wards hold firm against the unknown.",
+        "The machine tilts its head in curiosity. That command is not found in the grimoire of known arts.",
     ],
     "navigation": [
         "You tread deeper into the directory labyrinth. The way back begins to dissolve.",
@@ -61,12 +80,6 @@ SPECTRAL_ECHOES: Dict[str, List[str]] = {
         "The repository tree branches into forgotten realms. Every commit is a tether to a past life.",
         "You inspect the differences in the code. What was deleted still lingers in the git reflog.",
     ],
-    "blocked_malicious": [
-        "The void rejects your blade. Destructive incantations are bound by ancient warding runes.",
-        "You sought ruin, mortal, but the shell's spectral wards extinguish your command before it strikes.",
-        "A hollow laughter echoes through the terminal. Destruction is forbidden within this haunted sanctum.",
-        "The machine trembles, then holds firm. That destructive curse will not touch these disks.",
-    ],
     "blocked_injection": [
         "Chaining runes and hidden pipes cannot pierce my warding veil.",
         "The specter snuffs out your operator metacharacters. Clean speech only in the spirit realm.",
@@ -82,6 +95,7 @@ SPECTRAL_ECHOES: Dict[str, List[str]] = {
         "Silicon pulses with an uncanny chill. The command has echoed into the machine.",
     ],
 }
+
 
 
 class GhostEngine:
@@ -225,13 +239,20 @@ class GhostEngine:
         """Construct the prompt sent to Ollama, treating input as untrusted."""
         safe_cmd = command.replace("\n", " ").replace('"', "'")[:100]
         return (
-            f"Analyze the command: \"{safe_cmd}\"\n"
+            f"Command entered: \"{safe_cmd}\"\n"
             f"Technical function: {report.explanation}\n"
             f"Safety evaluation: {report.risk_level.value} ({report.reason})\n\n"
             "Format your response as:\n"
-            "[Whisper] <concise eerie or humorous commentary (1 sentence)>\n"
-            "[Explanation] <accurate command explanation (1 sentence)>\n"
-            "[Risk Warning] <risk warning if warranted, otherwise 'None'>"
+            "[Whisper] <1-2 sentences of eerie or humorous commentary relating directly to this command>\n"
+            "[Explanation] <1 accurate sentence explaining what the command does>\n"
+            "[Risk Warning] <risk warning if warranted, otherwise 'None'>\n\n"
+            "Style guidance:\n"
+            "- For 'ls': express curiosity about what is hidden in the directory.\n"
+            "- For 'git status': eerie comment on uncommitted or lingering changes.\n"
+            "- For 'python': playful warning about awakening another process.\n"
+            "- For 'rm' or destructive commands: serious warning about irreversible data loss.\n"
+            "- For unknown or blocked commands: an atmospheric but honest response.\n"
+            "- Never invent command output or claim execution happened."
         )
 
     def _clean_commentary(self, text: str) -> str:
@@ -269,31 +290,43 @@ class GhostEngine:
     def _spectral_fallback_triad(self, command: str, report: SafetyReport) -> tuple[str, str, str]:
         """Generate deterministic triad when local LLM is offline or times out."""
         cmd_lower = command.strip().lower()
+        parts = cmd_lower.split()
+        base_cmd = parts[0] if parts else ""
 
         if report.risk_level == RiskLevel.BLOCKED:
             if any(op in command for op in [";", "&&", "||", "|", ">", "<", "$"]):
                 pool = SPECTRAL_ECHOES["blocked_injection"]
+            elif any(d in base_cmd for d in ["rm", "del", "erase", "format", "dd", "mkfs", "wipe", "shred"]):
+                pool = SPECTRAL_ECHOES["blocked_destructive"]
+            elif "not in the ghosttrace allowlist" in report.reason.lower():
+                pool = SPECTRAL_ECHOES["unknown_command"]
             else:
-                pool = SPECTRAL_ECHOES["blocked_malicious"]
+                pool = SPECTRAL_ECHOES["blocked_destructive"]
             risk = f"BLOCKED: {report.reason}"
+        elif base_cmd in ("python", "python3"):
+            pool = SPECTRAL_ECHOES["python_process"]
+            risk = f"SENSITIVE: {report.reason}"
+        elif "git" in base_cmd and ("status" in cmd_lower or len(parts) == 1):
+            pool = SPECTRAL_ECHOES["git_status"]
+            risk = "None" if report.risk_level == RiskLevel.SAFE else f"SENSITIVE: {report.reason}"
+        elif "git" in base_cmd:
+            pool = SPECTRAL_ECHOES["git_ops"]
+            risk = "None" if report.risk_level == RiskLevel.SAFE else f"SENSITIVE: {report.reason}"
         elif report.risk_level == RiskLevel.SENSITIVE:
             pool = SPECTRAL_ECHOES["sensitive"]
             risk = f"SENSITIVE: {report.reason}"
-        elif any(c in cmd_lower for c in ["ls", "dir"]):
+        elif base_cmd in ("ls", "dir") or any(c in cmd_lower for c in ["ls ", "dir "]):
             pool = SPECTRAL_ECHOES["dir_inspection"]
             risk = "None"
-        elif any(c in cmd_lower for c in ["cd", "pwd"]):
+        elif base_cmd in ("cd", "pwd"):
             pool = SPECTRAL_ECHOES["navigation"]
             risk = "None"
-        elif any(c in cmd_lower for c in ["cat", "type", "head", "tail"]):
+        elif base_cmd in ("cat", "type", "head", "tail"):
             pool = SPECTRAL_ECHOES["file_reading"]
             risk = "None"
-        elif any(c in cmd_lower for c in ["whoami", "date", "time", "hostname", "uptime"]):
+        elif base_cmd in ("whoami", "date", "time", "hostname", "uptime"):
             pool = SPECTRAL_ECHOES["identity"]
             risk = "None"
-        elif "git" in cmd_lower:
-            pool = SPECTRAL_ECHOES["git_ops"]
-            risk = "None" if report.risk_level == RiskLevel.SAFE else f"SENSITIVE: {report.reason}"
         else:
             pool = SPECTRAL_ECHOES["generic"]
             risk = "None"
@@ -301,3 +334,4 @@ class GhostEngine:
         commentary = random.choice(pool)
         explanation = report.explanation
         return commentary, explanation, risk
+
