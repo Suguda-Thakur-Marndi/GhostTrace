@@ -37,9 +37,13 @@ def test_shell_exit_command(shell: HauntedShell):
 
 
 def test_shell_model_switch(shell: HauntedShell):
+    assert shell.config.model == "gemma3:4b"
+    shell.cmd_model("qwen2.5:1.5b")
+    assert shell.config.model == "qwen2.5:1.5b"
+    assert shell.ghost.config.model == "qwen2.5:1.5b"
     shell.cmd_model("gemma3:4b")
     assert shell.config.model == "gemma3:4b"
-    assert shell.ghost.config.model == "gemma3:4b"
+
 
 
 def test_shell_personality_switch(shell: HauntedShell):

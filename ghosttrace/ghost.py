@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import random
+import re
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from ghosttrace.config import GhostConfig
+from ghosttrace.config import DEFAULT_MODEL, GhostConfig
 from ghosttrace.ollama_client import (
     OllamaClient,
     OllamaConnectionError,
     OllamaModelNotFoundError,
+    OllamaResponseError,
     OllamaTimeoutError,
 )
 from ghosttrace.safety import RiskLevel, SafetyReport
@@ -26,6 +28,9 @@ class GhostWhisper:
     model: str
     latency_ms: float
     error_notice: Optional[str] = None
+    commentary: Optional[str] = None
+    explanation: Optional[str] = None
+    risk_warning: Optional[str] = None
 
 
 # Curated repository of deterministic whispers for offline or fallback operation
@@ -80,7 +85,7 @@ SPECTRAL_ECHOES: Dict[str, List[str]] = {
 
 
 class GhostEngine:
-    """Coordinates atmospheric commentary generation via Ollama or deterministic fallback."""
+    """Coordinates atmospheric commentary generation via local Ollama or deterministic fallback."""
 
     def __init__(self, config: GhostConfig, client: Optional[OllamaClient] = None):
         self.config = config
@@ -91,22 +96,26 @@ class GhostEngine:
         )
 
     def whisper(self, command: str, report: SafetyReport) -> GhostWhisper:
-        """Generate eerie commentary for a given command and its safety evaluation."""
+        """Generate eerie commentary, explanation, and risk assessment for a command."""
         start_time = time.perf_counter()
 
         # If offline_only is enabled in config, immediately provide a deterministic spectral echo
         if self.config.offline_only:
-            echo = self._spectral_fallback(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             latency = (time.perf_counter() - start_time) * 1000.0
+            formatted_text = self._format_triad(echo, expl, risk_warn)
             return GhostWhisper(
-                text=echo,
+                text=formatted_text,
                 source="spectral_echo",
                 model="deterministic_offline",
                 latency_ms=latency,
                 error_notice="Offline mode active (deterministic spectral voice).",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
 
-        # Build prompt for local Ollama
+        # Build prompt for local Ollama chat endpoint
         system_prompt = self.config.get_system_prompt()
         user_prompt = self._build_prompt(command, report)
 
@@ -120,84 +129,114 @@ class GhostEngine:
             )
             latency = (time.perf_counter() - start_time) * 1000.0
 
-            # Sanitize commentary to ensure it remains a safe, clean 1-2 sentence text
             cleaned = self._clean_commentary(commentary)
             if cleaned:
+                comm, expl, risk_warn = self._parse_triad(cleaned, report)
                 return GhostWhisper(
                     text=cleaned,
                     source="ollama",
                     model=self.config.model,
                     latency_ms=latency,
+                    commentary=comm,
+                    explanation=expl,
+                    risk_warning=risk_warn,
                 )
-            # If model returned empty string, fall back
-            fallback_echo = self._spectral_fallback(command, report)
+
+            # If model returned empty string, fall back to deterministic echo
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             return GhostWhisper(
-                text=fallback_echo,
+                text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
                 model=self.config.model,
                 latency_ms=latency,
                 error_notice="Model produced empty response.",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
 
         except OllamaModelNotFoundError as err:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo = self._spectral_fallback(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             return GhostWhisper(
-                text=echo,
+                text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
                 model=self.config.model,
                 latency_ms=latency,
                 error_notice=f"Model '{self.config.model}' missing from Ollama. Run: ollama pull {self.config.model}",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
         except OllamaTimeoutError:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo = self._spectral_fallback(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             return GhostWhisper(
-                text=echo,
+                text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
                 model=self.config.model,
                 latency_ms=latency,
                 error_notice=f"Ollama inference timed out after {self.config.timeout_seconds}s.",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
         except OllamaConnectionError:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo = self._spectral_fallback(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             return GhostWhisper(
-                text=echo,
+                text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
                 model=self.config.model,
                 latency_ms=latency,
                 error_notice="Ollama daemon unreachable at localhost:11434.",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
+            )
+        except OllamaResponseError as err:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            return GhostWhisper(
+                text=self._format_triad(echo, expl, risk_warn),
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice=f"Ollama response error: {err}",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
         except Exception as err:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo = self._spectral_fallback(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
             return GhostWhisper(
-                text=echo,
+                text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
                 model=self.config.model,
                 latency_ms=latency,
                 error_notice=f"Inference error: {err}",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
             )
 
     def _build_prompt(self, command: str, report: SafetyReport) -> str:
         """Construct the prompt sent to Ollama, treating input as untrusted."""
-        # Sanitize command display inside prompt to prevent prompt injection
-        safe_cmd = command.replace("\n", " ").replace('"', "'")[:80]
+        safe_cmd = command.replace("\n", " ").replace('"', "'")[:100]
         return (
-            f"The user entered the shell command: \"{safe_cmd}\".\n"
-            f"Technical context: {report.explanation}\n"
-            f"Safety evaluation: {report.risk_level.value}. {report.reason}\n\n"
-            "Respond ONLY with a short, eerie, 1-to-2 sentence spooky whisper about this action. "
-            "Do not execute or simulate commands. Do not write markdown headings. Keep it atmospheric."
+            f"Analyze the command: \"{safe_cmd}\"\n"
+            f"Technical function: {report.explanation}\n"
+            f"Safety evaluation: {report.risk_level.value} ({report.reason})\n\n"
+            "Format your response as:\n"
+            "[Whisper] <concise eerie or humorous commentary (1 sentence)>\n"
+            "[Explanation] <accurate command explanation (1 sentence)>\n"
+            "[Risk Warning] <risk warning if warranted, otherwise 'None'>"
         )
 
     def _clean_commentary(self, text: str) -> str:
-        """Ensure commentary is clean, single paragraph, free of quotes or markdown fences."""
-        import re
-
+        """Ensure commentary is clean and free of markdown code blocks."""
         cleaned = text.strip()
-        # Remove opening ```markdown or ``` and closing ```
         if cleaned.startswith("```"):
             cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", cleaned)
             cleaned = re.sub(r"\s*```$", "", cleaned)
@@ -205,13 +244,30 @@ class GhostEngine:
         lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
         if not lines:
             return ""
-        joined = " ".join(lines)
-        joined = joined.replace("```", "").strip(' \t\n\r"')
-        return joined
+        return "\n".join(lines).strip(' \t\n\r"')
 
+    def _parse_triad(self, text: str, report: SafetyReport) -> tuple[str, str, str]:
+        """Extract structured commentary, explanation, and risk warning from model output."""
+        whisper_match = re.search(r"\[Whisper\]\s*(.*?)(?=\n\[|\Z)", text, re.IGNORECASE | re.DOTALL)
+        expl_match = re.search(r"\[Explanation\]\s*(.*?)(?=\n\[|\Z)", text, re.IGNORECASE | re.DOTALL)
+        risk_match = re.search(r"\[Risk Warning\]\s*(.*?)(?=\n\[|\Z)", text, re.IGNORECASE | re.DOTALL)
 
-    def _spectral_fallback(self, command: str, report: SafetyReport) -> str:
-        """Select a context-appropriate deterministic whisper from spectral echoes."""
+        commentary = whisper_match.group(1).strip() if whisper_match else text.splitlines()[0]
+        explanation = expl_match.group(1).strip() if expl_match else report.explanation
+        risk = risk_match.group(1).strip() if risk_match else ("None" if report.risk_level == RiskLevel.SAFE else report.reason)
+
+        return commentary, explanation, risk
+
+    def _format_triad(self, commentary: str, explanation: str, risk_warning: str) -> str:
+        """Format the 3 elements into readable terminal text."""
+        return (
+            f"[Whisper] {commentary}\n"
+            f"[Explanation] {explanation}\n"
+            f"[Risk Warning] {risk_warning}"
+        )
+
+    def _spectral_fallback_triad(self, command: str, report: SafetyReport) -> tuple[str, str, str]:
+        """Generate deterministic triad when local LLM is offline or times out."""
         cmd_lower = command.strip().lower()
 
         if report.risk_level == RiskLevel.BLOCKED:
@@ -219,19 +275,29 @@ class GhostEngine:
                 pool = SPECTRAL_ECHOES["blocked_injection"]
             else:
                 pool = SPECTRAL_ECHOES["blocked_malicious"]
+            risk = f"BLOCKED: {report.reason}"
         elif report.risk_level == RiskLevel.SENSITIVE:
             pool = SPECTRAL_ECHOES["sensitive"]
+            risk = f"SENSITIVE: {report.reason}"
         elif any(c in cmd_lower for c in ["ls", "dir"]):
             pool = SPECTRAL_ECHOES["dir_inspection"]
+            risk = "None"
         elif any(c in cmd_lower for c in ["cd", "pwd"]):
             pool = SPECTRAL_ECHOES["navigation"]
+            risk = "None"
         elif any(c in cmd_lower for c in ["cat", "type", "head", "tail"]):
             pool = SPECTRAL_ECHOES["file_reading"]
+            risk = "None"
         elif any(c in cmd_lower for c in ["whoami", "date", "time", "hostname", "uptime"]):
             pool = SPECTRAL_ECHOES["identity"]
+            risk = "None"
         elif "git" in cmd_lower:
             pool = SPECTRAL_ECHOES["git_ops"]
+            risk = "None" if report.risk_level == RiskLevel.SAFE else f"SENSITIVE: {report.reason}"
         else:
             pool = SPECTRAL_ECHOES["generic"]
+            risk = "None"
 
-        return random.choice(pool)
+        commentary = random.choice(pool)
+        explanation = report.explanation
+        return commentary, explanation, risk

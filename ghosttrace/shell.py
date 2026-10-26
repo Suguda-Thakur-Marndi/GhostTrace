@@ -316,16 +316,27 @@ class HauntedShell:
         latency = f"[dim]{whisper.latency_ms:.0f}ms[/dim]"
 
         notice = f"\n[dim red]Notice: {whisper.error_notice}[/dim red]" if whisper.error_notice else ""
-        content = f"[italic magenta]\"{whisper.text}\"[/italic magenta]{notice}"
+
+        if whisper.commentary and whisper.explanation:
+            body_parts = [
+                f"[bold magenta]Ghost Commentary:[/bold magenta] [italic]\"{whisper.commentary}\"[/italic]",
+                f"[bold cyan]Technical Explanation:[/bold cyan] {whisper.explanation}",
+            ]
+            if whisper.risk_warning and whisper.risk_warning.lower() != "none":
+                body_parts.append(f"[bold yellow]Risk Warning:[/bold yellow] {whisper.risk_warning}")
+            content = "\n".join(body_parts) + notice
+        else:
+            content = f"[italic magenta]\"{whisper.text}\"[/italic magenta]{notice}"
 
         self.console.print(
             Panel(
                 content,
-                title=f"[bold green]👻 Ghost Whisper[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}",
+                title=f"[bold green]👻 GhostTrace AI[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}",
                 border_style="magenta",
                 box=box.ROUNDED,
             )
         )
+
 
     def _render_execution_result(self, result: CommandRunner.ExecutionResult) -> None:
         """Render command execution outcome."""

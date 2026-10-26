@@ -62,13 +62,15 @@ flowchart TD
 ## 🌟 Key Features
 
 - 💀 **Haunted Interactive REPL**: Atmospheric Gothic terminal powered by [Rich](https://github.com/Textualize/rich) with customized ASCII sigils, dynamic directory prompts, and color-coded risk panels.
-- 🧠 **100% Local Inference**: Zero cloud API dependencies. Runs locally on your hardware via [Ollama](https://ollama.com/) with `qwen2.5:1.5b` or `gemma3:4b`.
+- 🧠 **100% Local Inference**: Zero cloud API dependencies. Runs locally on your hardware via [Ollama](https://ollama.com/) with **`gemma3:4b`** by default (or configurable open-weight models).
+- 💬 **Ollama `/api/chat` Integration**: Structured chat communication with the local Ollama daemon enforcing system instructions and triadic responses (eerie commentary, technical explanation, risk warning).
 - 🛡️ **Deterministic Safety Wards**:
   - **No `shell=True`**: Strictly executes subprocesses via argument lists.
   - **Forbidden Metacharacters**: Prohibits command chaining (`&&`, `||`, `;`), redirection (`>`, `<`), pipelines (`|`), and command substitution (`$()`, `` ` ``).
   - **Permanent Denylist**: Destructive operations (`rm`, `del`, `format`, `dd`, `mkfs`, fork bombs) are instantly rejected before execution.
   - **Confirmation Gate**: Sensitive actions (e.g., `git commit`, `python script.py`, `pip install`) require explicit `[y/N]` authorization.
-- 👻 **Spectral Personas**: Switch between distinct ghost personalities at runtime:
+- 👻 **Spectral Personas**: GhostTrace persona with consistent system instructions:
+  - `ghosttrace`: Eerie, occasionally humorous, technically accurate spirit inhabiting the terminal (Default).
   - `spectral_wraith`: Ancient, melancholic spirit of forgotten mainframes and dead processes.
   - `cyber_poltergeist`: Glitchy, menacing entity haunting CPU cycles and RAM sectors.
   - `crypt_keeper`: Macabre chronicler of file demise and digital tombstones.
@@ -81,10 +83,8 @@ flowchart TD
 ### 1. Prerequisites
 - **Python 3.11+** installed
 - **Ollama** installed ([download from ollama.com](https://ollama.com/))
-- Pull an open-weight model:
+- Pull the required default model:
   ```powershell
-  ollama pull qwen2.5:1.5b
-  # Optional: richer 4B parameter model
   ollama pull gemma3:4b
   ```
 
@@ -102,20 +102,21 @@ pip install -r requirements.txt
 
 ### 3. Launching GhostTrace
 ```powershell
-# Standard interactive shell with default model (qwen2.5:1.5b)
+# Standard interactive shell with default model (gemma3:4b)
 python -m ghosttrace.main
-
-# Launch with gemma3:4b
-python -m ghosttrace.main --model gemma3:4b
 
 # Launch in offline deterministic mode
 python -m ghosttrace.main --offline
 
 # Perform system health check
 python -m ghosttrace.main --check-health
+
+# One-shot command analysis without execution
+python -m ghosttrace.main --explain "git status"
 ```
 
 ---
+
 
 ## 📜 Example Sessions
 
