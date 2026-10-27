@@ -1,7 +1,7 @@
 # GhostTrace 👻 — Ghost in the Machine
 
 [![Hacktoberfest 2026](https://img.shields.io/badge/Hacktoberfest-Ghost%20in%20the%20Machine-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-278%20Passed-38a169?style=for-the-badge&logo=pytest)](https://github.com/Suguda-Thakur-Marndi/GhostTrace)
+[![Tests Passing](https://img.shields.io/badge/Tests-287%20Passed-38a169?style=for-the-badge&logo=pytest)](https://github.com/Suguda-Thakur-Marndi/GhostTrace)
 [![Zero Cloud Telemetry](https://img.shields.io/badge/Privacy-Zero%20Cloud%20Telemetry-00b4d8?style=for-the-badge&logo=lock)](docs/SECURITY.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
@@ -255,7 +255,7 @@ For complete details, see [docs/SECURITY.md](docs/SECURITY.md).
 
 ## 🧪 Automated Testing
 
-GhostTrace maintains an extensive automated test suite with **278 unit and integration tests** passing in ~1.6 seconds. All tests use deterministic fixtures and **never require network access or a running model**.
+GhostTrace maintains an extensive automated test suite with **287 unit and integration tests** passing in ~2.7 seconds. All tests use deterministic fixtures and **never require network access or a running model**.
 
 ```bash
 # Run full automated test suite

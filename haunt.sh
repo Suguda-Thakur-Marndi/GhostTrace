@@ -221,6 +221,7 @@ haunt() {
             if [ -f "$__HAUNT_GHOSTD" ]; then
                 "$__HAUNT_PYTHON" "$__HAUNT_GHOSTD" forget
             fi
+            __HAUNT_PENDING_REQ=""
             ;;
         help|--help|-h)
             cat << 'EOF'
