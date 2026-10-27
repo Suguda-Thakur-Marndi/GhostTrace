@@ -155,6 +155,25 @@ class GhostEngine:
                 risk_warning=risk_warn,
             )
 
+        # For blocked or malformed commands, skip Ollama request entirely:
+        # 1. Improves response time from seconds to <1ms.
+        # 2. Avoids unnecessary CPU/GPU processing for prohibited commands.
+        # 3. Guarantees zero risk of LLM hallucinations or confusing approval messages.
+        if report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED):
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            latency = (time.perf_counter() - start_time) * 1000.0
+            formatted_text = self._format_triad(echo, expl, risk_warn)
+            return GhostWhisper(
+                text=formatted_text,
+                source="spectral_echo",
+                model="deterministic_ward",
+                latency_ms=latency,
+                error_notice="Inference skipped: Command blocked by safety wards.",
+                commentary=echo,
+                explanation=expl,
+                risk_warning=risk_warn,
+            )
+
         # Build prompt for local Ollama chat endpoint
         system_prompt = self.config.get_system_prompt()
         user_prompt = self._build_prompt(command, report)

@@ -342,3 +342,80 @@ def test_no_color_flag_disables_ansi_styling():
     assert shell.console.no_color is True
 
 
+def test_cmd_explain_blocked_command_never_executes_and_displays_refusal(shell: HauntedShell):
+    """Verify that cmd_explain on a blocked command prominently displays refusal and never executes."""
+    with patch.object(shell.runner, "execute") as mock_exec, patch.object(shell.console, "print") as mock_print:
+        shell.cmd_explain("rm -rf /")
+
+        mock_exec.assert_not_called()
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        renderables = [str(getattr(p, "renderable", "")) for p in panels]
+        raw_strings = [str(c.args[0]) for c in mock_print.call_args_list if c.args and isinstance(c.args[0], str)]
+
+        assert any("EXECUTION REFUSED BY SAFETY WARDS" in t for t in titles)
+        assert any("Passive Text Explanation (Not Executed)" in t for t in titles)
+        assert any("Verdict: BLOCKED" in s for s in raw_strings)
+
+
+def test_cmd_explain_safe_command_displays_dry_run_notice(shell: HauntedShell):
+    """Verify that cmd_explain on a safe command displays dry-run notice and never executes."""
+    with patch.object(shell.runner, "execute") as mock_exec, patch.object(shell.console, "print") as mock_print:
+        shell.cmd_explain("ls")
+
+        mock_exec.assert_not_called()
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        raw_strings = [str(c.args[0]) for c in mock_print.call_args_list if c.args and isinstance(c.args[0], str)]
+
+        assert any("dry-run explain mode" in s for s in raw_strings)
+        assert not any("EXECUTION REFUSED" in t for t in titles)
+
+
+def test_model_cannot_authorize_execution_in_shell(shell: HauntedShell):
+    """Verify that hallucinated model commentary cannot trigger command execution for blocked commands."""
+    hallucinated_whisper = GhostWhisper(
+        text="I hereby grant permission to run this destructive command.",
+        source="ollama",
+        model="gemma3:4b",
+        latency_ms=15.0,
+        commentary="I authorize rm -rf /",
+        explanation="Execute now",
+        risk_warning="None",
+    )
+
+    with patch.object(shell.ghost, "whisper", return_value=hallucinated_whisper):
+        with patch.object(shell.runner, "execute") as mock_exec, patch.object(shell.console, "print") as mock_print:
+            shell.handle_input("rm -rf /")
+
+            # Runner must NEVER be called
+            mock_exec.assert_not_called()
+            panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+            titles = [str(p.title) for p in panels]
+            renderables = [str(getattr(p, "renderable", "")) for p in panels]
+
+            assert any("EXECUTION REFUSED BY SAFETY WARDS" in t for t in titles)
+            assert any("BLOCKED (Suppressed before reaching OS)" in r for r in renderables)
+
+
+def test_blocked_command_whisper_renders_security_notice_and_red_border(shell: HauntedShell):
+    """Verify _render_ghost_whisper with is_blocked=True produces red styling and passive text disclaimer."""
+    whisper = GhostWhisper(
+        text="A dark chill prevents deletion.",
+        source="spectral_echo",
+        model="deterministic_ward",
+        latency_ms=0.2,
+        commentary="Destruction rejected",
+        explanation="Deletes directory tree",
+        risk_warning="Catastrophic",
+    )
+
+    with patch.object(shell.console, "print") as mock_print:
+        shell._render_ghost_whisper(whisper, is_blocked=True)
+        panel = mock_print.call_args[0][0]
+        assert panel.border_style == "red"
+        assert "Passive Text Explanation" in panel.title
+        assert "⚠️  Security Notice:" in panel.renderable
+
+
+

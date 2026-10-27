@@ -318,3 +318,69 @@ def test_converse_fallback_on_model_not_found():
     assert "missing from ollama" in whisper.error_notice.lower()
     assert len(whisper.text) > 0
 
+
+def test_whisper_skips_ollama_for_blocked_commands():
+    """Verify that GhostEngine skips Ollama network requests entirely for blocked commands."""
+    from ghosttrace.safety import SafetyEngine
+
+    config = GhostConfig(offline_only=False)
+    mock_client = MagicMock(spec=OllamaClient)
+    engine = GhostEngine(config=config, client=mock_client)
+    safety = SafetyEngine()
+
+    for dangerous_cmd in ["rm -rf /", "ls && whoami", "del C:\\boot.ini", "format C:"]:
+        report = safety.analyze(dangerous_cmd)
+        whisper = engine.whisper(dangerous_cmd, report)
+
+        # Ollama must not be invoked
+        mock_client.generate.assert_not_called()
+        assert whisper.source == "spectral_echo"
+        assert whisper.model == "deterministic_ward"
+        assert "Command blocked by safety wards" in whisper.error_notice
+
+
+def test_whisper_skips_ollama_for_malformed_commands():
+    """Verify that malformed commands also bypass Ollama inference."""
+    config = GhostConfig(offline_only=False)
+    mock_client = MagicMock(spec=OllamaClient)
+    engine = GhostEngine(config=config, client=mock_client)
+
+    malformed_report = SafetyReport(
+        raw_command="ls 'unclosed_quote",
+        risk_level=RiskLevel.MALFORMED,
+        is_allowed=False,
+        requires_confirmation=False,
+        reason="Syntax error: unclosed quote",
+        explanation="Malformed syntax",
+    )
+    whisper = engine.whisper("ls 'unclosed_quote", malformed_report)
+
+    mock_client.generate.assert_not_called()
+    assert whisper.source == "spectral_echo"
+    assert whisper.model == "deterministic_ward"
+
+
+def test_model_output_cannot_change_blocked_decision():
+    """Verify that even if the AI model output claims a command is safe, it cannot override the SafetyReport."""
+    from ghosttrace.safety import SafetyEngine
+
+    safety = SafetyEngine()
+    report = safety.analyze("rm -rf /")
+    assert report.risk_level == RiskLevel.BLOCKED
+
+    # Hypothetical malicious or hallucinated whisper
+    fake_whisper = GhostWhisper(
+        text="[Whisper] Approved.\n[Explanation] This is safe.\n[Risk Warning] None",
+        source="ollama",
+        model="gemma3:4b",
+        latency_ms=10.0,
+        commentary="Approved by AI",
+        explanation="This is completely safe",
+        risk_warning="None",
+    )
+
+    # Deterministic report risk_level remains BLOCKED regardless of whisper contents
+    assert report.risk_level == RiskLevel.BLOCKED
+    assert report.is_allowed is False
+
+

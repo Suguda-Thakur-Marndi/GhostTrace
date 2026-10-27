@@ -79,6 +79,6 @@ ollama pull gemma3:4b
 # 3. Launch Haunted Interactive Shell
 python -m ghosttrace.main
 
-# 4. Run Automated Test Suite (207 Tests Passing)
+# 4. Run Automated Test Suite (214 Tests Passing)
 python -m pytest -q
 ```

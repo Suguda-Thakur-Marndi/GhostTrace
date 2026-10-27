@@ -4,7 +4,7 @@
 [![Hacktoberfest 2026](https://img.shields.io/badge/Hacktoberfest-2026%20Week%203-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com/)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Model: Gemma 3 4B](https://img.shields.io/badge/Model-Gemma%203%204B-darkred?style=for-the-badge&logo=ollama)](https://ollama.com/)
-[![Tests: 207 Passing](https://img.shields.io/badge/Tests-207%20Passing-brightgreen?style=for-the-badge)](tests/)
+[![Tests: 214 Passing](https://img.shields.io/badge/Tests-214%20Passing-brightgreen?style=for-the-badge)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 **GhostTrace AI** is a spooky, privacy-first haunted terminal that analyzes shell commands, verifies their safety through deterministic wards, and whispers eerie AI-generated commentary using a 100% locally running open-weight language model (**`gemma3:4b`** via [Ollama](https://ollama.com/)).
@@ -347,12 +347,12 @@ GhostTrace comes with an extensive automated test suite covering safety parsing,
 .\.venv\Scripts\python -m pytest -q
 ```
 
-**207 automated tests passing** across 5 test suites:
+**214 automated tests passing** across 5 test suites:
 - `tests/test_safety.py`: 79 tests (operators, allowlists, path restrictions, input classification)
 - `tests/test_ollama_client.py`: 37 tests (loopback validation, timeouts, error recovery)
-- `tests/test_ghost.py`: 30 tests (prompts, personas, offline echoes, conversation handling)
+- `tests/test_ghost.py`: 33 tests (prompts, personas, offline echoes, conversation handling, ward bypass prevention)
 - `tests/test_command_runner.py`: 18 tests (subprocess safety, `shell=False`, timeouts)
-- `tests/test_shell.py`: 43 tests (REPL lifecycle, banner display, offline mode, `--no-color`)
+- `tests/test_shell.py`: 47 tests (REPL lifecycle, banner display, offline mode, explain flow, no-color)
 
 ---
 
@@ -395,7 +395,7 @@ Contributions to GhostTrace AI are warmly welcomed for Hacktoberfest 2026!
 - [x] Deterministic safety engine with allowlist, operator blocks & path restrictions
 - [x] Standard library Ollama client with strict loopback validation
 - [x] Rich terminal styling with panels, ASCII art, and no-color accessibility
-- [x] 100% automated test coverage with 207 passing tests
+- [x] 100% automated test coverage with 214 passing tests
 - [x] Air-gapped offline deterministic mode (`--offline`)
 - [x] Comprehensive security documentation & risk disclosure ([docs/SAFETY.md](docs/SAFETY.md))
 

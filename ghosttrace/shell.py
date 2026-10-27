@@ -299,31 +299,48 @@ class HauntedShell:
             return
 
         report = self.safety.analyze(cmd_to_explain)
+        is_blocked = report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED)
         whisper = self.ghost.whisper(cmd_to_explain, report)
 
         self._render_technical_analysis(report)
-        self._render_ghost_whisper(whisper)
-        self.console.print("[dim italic]Analysis complete. Command was not executed.[/dim italic]\n")
+        self._render_ghost_whisper(whisper, is_blocked=is_blocked)
+
+        if is_blocked:
+            self.console.print(
+                Panel(
+                    f"[bold red]Refused by safety wards:[/bold red] {report.reason}\n"
+                    f"[bold red]Execution Status:[/bold red] BLOCKED (Will never reach the operating system)\n"
+                    f"[dim]The commentary above is an explanation of the submitted text only, NOT an authorization or approval.[/dim]",
+                    title="[bold red]EXECUTION REFUSED BY SAFETY WARDS[/bold red]",
+                    border_style="red",
+                    box=box.ROUNDED,
+                )
+            )
+            self.console.print("[bold red]Verdict: BLOCKED. Command was not executed.[/bold red]\n")
+        else:
+            self.console.print("[dim italic]Analysis complete. Command was not executed (dry-run explain mode).[/dim italic]\n")
 
     def execute_command_pipeline(self, raw_command: str) -> None:
         """Analyze, whisper, verify confirmation, and execute the command safely."""
         # 1. Deterministic safety analysis
         report = self.safety.analyze(raw_command)
+        is_blocked = report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED)
 
         # 2. Render technical explanation & risk level
         self._render_technical_analysis(report)
 
         # 3. Generate and render the Ghost AI commentary
         whisper = self.ghost.whisper(raw_command, report)
-        self._render_ghost_whisper(whisper)
+        self._render_ghost_whisper(whisper, is_blocked=is_blocked)
 
         # 4. Handle BLOCKED or MALFORMED commands
-        if report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED):
+        if is_blocked:
             self.console.print(
                 Panel(
                     f"[bold red]Refused by safety wards:[/bold red] {report.reason}\n"
-                    f"[dim]Command was suppressed before it could reach the operating system.[/dim]",
-                    title="[bold red]EXECUTION REFUSED[/bold red]",
+                    f"[bold red]Execution Status:[/bold red] BLOCKED (Suppressed before reaching OS)\n"
+                    f"[dim]The commentary above is an explanation of the submitted text only, NOT an authorization or approval.[/dim]",
+                    title="[bold red]EXECUTION REFUSED BY SAFETY WARDS[/bold red]",
                     border_style="red",
                     box=box.ROUNDED,
                 )
@@ -395,7 +412,7 @@ class HauntedShell:
             )
         )
 
-    def _render_ghost_whisper(self, whisper: GhostWhisper) -> None:
+    def _render_ghost_whisper(self, whisper: GhostWhisper, is_blocked: bool = False) -> None:
         """Render spectral commentary panel with restrained phosphor-green and muted gray styling."""
         source_badge = (
             f"[bold green]Ollama ({whisper.model})[/bold green]"
@@ -406,22 +423,35 @@ class HauntedShell:
 
         notice = f"\n[dim red]Notice: {whisper.error_notice}[/dim red]" if whisper.error_notice else ""
 
+        if is_blocked:
+            panel_title = f"[bold red]👻 GhostTrace AI • Passive Text Explanation (Not Executed)[/bold red] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
+            border_style = "red"
+        else:
+            panel_title = f"[bold green]👻 GhostTrace AI[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
+            border_style = "green"
+
         if whisper.commentary and whisper.explanation:
             body_parts = [
                 f"[bold green]Ghost Commentary:[/bold green] [italic]\"{whisper.commentary}\"[/italic]",
-                f"[dim]Technical Explanation:[/dim] {whisper.explanation}",
+                f"[dim]Technical Explanation (Passive Text Analysis):[/dim] {whisper.explanation}",
             ]
-            if whisper.risk_warning and whisper.risk_warning.lower() != "none":
+            if is_blocked:
+                body_parts.append(
+                    "[bold red]⚠️  Security Notice:[/bold red] [red]Commentary explains submitted text only. Command is blocked and cannot execute.[/red]"
+                )
+            elif whisper.risk_warning and whisper.risk_warning.lower() != "none":
                 body_parts.append(f"[bold red]Risk Warning:[/bold red] {whisper.risk_warning}")
             content = "\n".join(body_parts) + notice
         else:
             content = f"[italic green]\"{whisper.text}\"[/italic green]{notice}"
+            if is_blocked:
+                content += "\n[bold red]⚠️  Security Notice: Commentary explains submitted text only. Command is blocked and cannot execute.[/bold red]"
 
         self.console.print(
             Panel(
                 content,
-                title=f"[bold green]👻 GhostTrace AI[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}",
-                border_style="green",
+                title=panel_title,
+                border_style=border_style,
                 box=box.ROUNDED,
             )
         )
