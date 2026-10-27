@@ -232,3 +232,93 @@ def test_classify_dangerous_inputs_phrased_conversationally(dangerous_conversati
     """Verify dangerous syntax or destructive commands phrased conversationally are strictly classified as COMMAND."""
     assert classify_input(dangerous_conversational_input) == InputCategory.COMMAND
 
+
+@pytest.mark.parametrize(
+    "path_cmd",
+    [
+        "./ls",
+        "../ls",
+        "/bin/ls",
+        "/usr/bin/python",
+        "C:\\evil\\ls.exe",
+        "C:/evil/python.exe",
+        ".\\python.exe",
+        "..\\git.exe",
+    ],
+)
+def test_path_qualified_executables_blocked(safety: SafetyEngine, path_cmd: str):
+    """Verify that path-qualified command execution is strictly blocked to prevent allowlist evasion."""
+    report = safety.analyze(path_cmd)
+    assert report.risk_level == RiskLevel.BLOCKED
+    assert not report.is_allowed
+    assert "Path-qualified command execution" in report.reason
+
+
+def test_bare_exe_allowed_on_allowlist(safety: SafetyEngine):
+    """Verify bare command names ending in .exe without directory path are recognized."""
+    report_py = safety.analyze("python.exe app.py")
+    assert report_py.risk_level == RiskLevel.SENSITIVE
+    assert report_py.is_allowed
+
+    report_git = safety.analyze("git.exe status")
+    assert report_git.risk_level == RiskLevel.SAFE
+    assert report_git.is_allowed
+
+
+@pytest.mark.parametrize(
+    "env_proxy_cmd",
+    [
+        "env rm -rf /",
+        "env ls",
+        "env whoami",
+        "env python malicious.py",
+    ],
+)
+def test_env_proxy_execution_blocked(safety: SafetyEngine, env_proxy_cmd: str):
+    """Verify that invoking child commands through 'env' wrapper is blocked."""
+    report = safety.analyze(env_proxy_cmd)
+    assert report.risk_level == RiskLevel.BLOCKED
+    assert not report.is_allowed
+    assert "env" in report.reason.lower()
+
+
+def test_env_inspection_allowed(safety: SafetyEngine):
+    """Verify env without command-runner arguments is allowed for inspection."""
+    report = safety.analyze("env")
+    assert report.risk_level == RiskLevel.SAFE
+    assert report.is_allowed
+
+    report_flags = safety.analyze("env --version")
+    assert report_flags.risk_level == RiskLevel.SAFE
+    assert report_flags.is_allowed
+
+
+def test_git_rm_and_config_require_confirmation(safety: SafetyEngine):
+    """Verify git rm and git config alter state and require confirmation."""
+    report_rm = safety.analyze("git rm unwanted.py")
+    assert report_rm.risk_level == RiskLevel.SENSITIVE
+    assert report_rm.is_allowed
+    assert report_rm.requires_confirmation
+
+    report_cfg = safety.analyze("git config user.name attacker")
+    assert report_cfg.risk_level == RiskLevel.SENSITIVE
+    assert report_cfg.is_allowed
+    assert report_cfg.requires_confirmation
+
+
+@pytest.mark.parametrize(
+    "tightened_cmd",
+    [
+        "dir&whoami",
+        "ls &whoami",
+        "echo test&calc.exe",
+        "whoami\0echo",
+    ],
+)
+def test_tightened_forbidden_operators_blocked(safety: SafetyEngine, tightened_cmd: str):
+    """Verify unspaced & and null byte operators are blocked as forbidden operators."""
+    report = safety.analyze(tightened_cmd)
+    assert report.risk_level == RiskLevel.BLOCKED
+    assert not report.is_allowed
+
+

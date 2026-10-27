@@ -40,8 +40,10 @@ FORBIDDEN_OPERATORS: List[str] = [
     "`",
     "$(",
     "${",
+    "&",
     "\n",
     "\r",
+    "\0",
 ]
 
 # Destructive command names and patterns across Unix & Windows
@@ -89,6 +91,8 @@ SENSITIVE_GIT_SUBCOMMANDS: Set[str] = {
     "branch",
     "stash",
     "clean",
+    "rm",
+    "config",
 }
 
 # Built-in interactive shell commands
@@ -359,9 +363,23 @@ class SafetyEngine:
                 explanation="No valid command tokens found.",
             )
 
-        base_cmd = parsed_args[0].lower()
-        # Strip path or file extension if present (e.g. python.exe or ./script.py)
-        cmd_name = os.path.basename(base_cmd).replace(".exe", "")
+        raw_target = parsed_args[0]
+        base_cmd = raw_target.lower()
+
+        # Reject path-qualified command names (e.g. ./ls, C:\evil\cat, ../bin/python)
+        # Commands must be standard system utility names from PATH, not relative or absolute filesystem paths.
+        if "/" in base_cmd or "\\" in base_cmd or (os.name == "nt" and ":" in base_cmd):
+            return SafetyReport(
+                raw_command=raw_command,
+                risk_level=RiskLevel.BLOCKED,
+                is_allowed=False,
+                requires_confirmation=False,
+                reason=f"Path-qualified command execution '{raw_target}' is prohibited. Only standard system utilities from PATH are permitted.",
+                parsed_args=parsed_args,
+                explanation="Direct path execution is blocked to prevent allowlist evasion.",
+            )
+
+        cmd_name = base_cmd[:-4] if base_cmd.endswith(".exe") else base_cmd
 
         # 3. Check destructive command denylist
         is_destructive = (
@@ -379,6 +397,20 @@ class SafetyEngine:
                 parsed_args=parsed_args,
                 explanation=f"Command '{cmd_name}' deletes or modifies critical system storage, which is prohibited in GhostTrace MVP.",
             )
+
+        # 3b. Check command proxies/wrappers (e.g. env attempting to execute another command)
+        if cmd_name == "env" and len(parsed_args) > 1:
+            sub_args = [a for a in parsed_args[1:] if not a.startswith("-") and "=" not in a]
+            if sub_args:
+                return SafetyReport(
+                    raw_command=raw_command,
+                    risk_level=RiskLevel.BLOCKED,
+                    is_allowed=False,
+                    requires_confirmation=False,
+                    reason=f"Invoking commands through 'env' wrapper ('{sub_args[0]}') is prohibited.",
+                    parsed_args=parsed_args,
+                    explanation="Command proxy execution via 'env' is blocked by safety policy.",
+                )
 
 
         # Fork bomb patterns

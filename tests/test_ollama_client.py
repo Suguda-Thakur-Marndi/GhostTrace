@@ -190,3 +190,33 @@ def test_chat_malformed_response_structure(client: OllamaClient):
         with pytest.raises(OllamaResponseError) as exc_info:
             client.chat(messages=[{"role": "user", "content": "Hello"}])
         assert "missing 'message'" in str(exc_info.value)
+
+
+def test_chat_urllib_timeout_wrapped_error(client: OllamaClient):
+    """Verify that URLError containing TimeoutError reason is properly translated to OllamaTimeoutError."""
+    err = urllib.error.URLError(TimeoutError("timed out"))
+    with patch("urllib.request.urlopen", side_effect=err):
+        with pytest.raises(OllamaTimeoutError):
+            client.chat(messages=[{"role": "user", "content": "Hello"}])
+
+
+def test_list_models_urllib_timeout_wrapped_error(client: OllamaClient):
+    """Verify that list_models translates URLError with timeout reason to OllamaTimeoutError."""
+    err = urllib.error.URLError(TimeoutError("timed out"))
+    with patch("urllib.request.urlopen", side_effect=err):
+        with pytest.raises(OllamaTimeoutError):
+            client.list_models()
+
+
+def test_host_without_scheme_accepted():
+    """Verify host without scheme default handles localhost properly."""
+    c = OllamaClient(host="localhost:11434")
+    assert c.host == "localhost:11434"
+
+
+def test_unsupported_scheme_rejected():
+    """Verify non-HTTP schemes are rejected."""
+    with pytest.raises(OllamaError) as exc_info:
+        OllamaClient(host="ftp://localhost:11434")
+    assert "Unsupported URI scheme" in str(exc_info.value)
+

@@ -34,9 +34,9 @@ ASCII_BANNER = r"""
 class HauntedShell:
     """Atmospheric interactive terminal REPL hosting the ghost in the machine."""
 
-    def __init__(self, config: Optional[GhostConfig] = None):
+    def __init__(self, config: Optional[GhostConfig] = None, no_color: Optional[bool] = None):
         self.config = config or GhostConfig.load()
-        self.console = Console(legacy_windows=False)
+        self.console = Console(legacy_windows=False, no_color=no_color)
 
         self.safety = SafetyEngine(allowed_commands=self.config.allowed_commands, safe_mode=self.config.safe_mode)
         self.client = OllamaClient(
@@ -77,10 +77,32 @@ class HauntedShell:
                 )
             )
 
-        # Quick startup status line
+        # Quick startup status line - skip HTTP probe entirely if offline_only
         model_name = self.config.model
-        is_alive = self.client.is_available()
-        daemon_status = "[bold green]ONLINE[/bold green]" if is_alive else "[bold red]OFFLINE (Fallback)[/bold red]"
+        model_warning = ""
+
+        if self.config.offline_only:
+            daemon_status = "[dim yellow]OFFLINE (Forced)[/dim yellow]"
+        else:
+            is_alive = self.client.is_available()
+            if is_alive:
+                daemon_status = "[bold green]ONLINE[/bold green]"
+                try:
+                    models = self.client.list_models()
+                    if model_name not in models and not any(m.startswith(f"{model_name}:") or m == model_name for m in models):
+                        model_warning = (
+                            f" [bold yellow]Notice:[/bold yellow] Model [bold white]'{model_name}'[/bold white] is not installed locally.\n"
+                            f" [dim]Run: [bold white]ollama pull {model_name}[/bold white] in another terminal. GhostTrace will use deterministic fallback.\n[/dim]"
+                        )
+                except Exception:
+                    pass
+            else:
+                daemon_status = "[bold red]OFFLINE (Fallback)[/bold red]"
+                model_warning = (
+                    " [bold yellow]Notice:[/bold yellow] Ollama daemon is not reachable at localhost:11434.\n"
+                    " [dim]Verify Ollama is running with 'ollama serve'. GhostTrace will use deterministic fallback.\n[/dim]"
+                )
+
         persona = PERSONALITIES.get(self.config.personality, {}).get("title", self.config.personality)
 
         self.console.print(
@@ -89,6 +111,8 @@ class HauntedShell:
             f"[dim]Spirit Persona:[/dim] [bold green]{persona}[/bold green] | "
             f"[dim]Wards:[/dim] [bold green]{'STRICT' if self.config.safe_mode else 'LENIENT'}[/bold green]"
         )
+        if model_warning:
+            self.console.print(model_warning)
         self.console.print(
             " [dim]Type [bold white]'help'[/bold white] for the Grimoire or [bold white]'exit'[/bold white] to unbind the spirit.\n[/dim]"
         )
@@ -170,7 +194,7 @@ class HauntedShell:
 
     def cmd_clear(self) -> None:
         """Clear terminal and re-render the ghostly banner."""
-        os.system("cls" if os.name == "nt" else "clear")
+        self.console.clear()
         self.print_banner()
 
     def cmd_help(self) -> None:
@@ -196,24 +220,28 @@ class HauntedShell:
 
     def cmd_status(self) -> None:
         """Inspect and report application and model status."""
-        is_ollama_alive = self.client.is_available()
-        models = []
-        if is_ollama_alive:
-            try:
-                models = self.client.list_models()
-            except Exception:
-                models = []
+        if self.config.offline_only:
+            daemon_status = "[dim yellow]OFFLINE (Offline Mode)[/dim yellow]"
+            models = ["[dim]Query skipped in offline mode[/dim]"]
+        else:
+            is_ollama_alive = self.client.is_available()
+            models = []
+            if is_ollama_alive:
+                try:
+                    models = self.client.list_models()
+                except Exception:
+                    models = []
+            daemon_status = (
+                "[bold green]ONLINE (localhost:11434)[/bold green]"
+                if is_ollama_alive
+                else "[bold red]OFFLINE (Using Spectral Echoes fallback)[/bold red]"
+            )
 
         table = Table(title="[bold green]GHOSTTRACE SYSTEM SANCTUM[/bold green]", box=box.ROUNDED)
         table.add_column("Property", style="bold green", width=24)
         table.add_column("Current State", style="white")
 
-        table.add_row(
-            "Ollama Daemon",
-            "[bold green]ONLINE (localhost:11434)[/bold green]"
-            if is_ollama_alive
-            else "[bold red]OFFLINE (Using Spectral Echoes fallback)[/bold red]",
-        )
+        table.add_row("Ollama Daemon", daemon_status)
         table.add_row("Active Model", f"[bold green]{self.config.model}[/bold green]")
         table.add_row("Available Models", ", ".join(models) if models else "[dim]None discovered[/dim]")
         table.add_row("Inference Timeout", f"{self.config.timeout_seconds} seconds")
@@ -228,6 +256,9 @@ class HauntedShell:
     def cmd_model(self, model_name: str) -> None:
         """List or switch the active LLM."""
         if not model_name:
+            if self.config.offline_only:
+                self.console.print(f"[dim]Active model:[/dim] [bold green]{self.config.model}[/bold green] [dim](Offline mode active)[/dim]")
+                return
             try:
                 available = self.client.list_models()
                 self.console.print(f"[dim]Active model:[/dim] [bold green]{self.config.model}[/bold green]")

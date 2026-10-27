@@ -49,6 +49,11 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         help="Disable startup delays and animations for accessibility and automated testing.",
     )
     parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI color output (also respects NO_COLOR environment variable).",
+    )
+    parser.add_argument(
         "--host",
         type=str,
         default=None,
@@ -81,9 +86,9 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
 
 
 
-def run_health_check(config: GhostConfig) -> int:
+def run_health_check(config: GhostConfig, no_color: Optional[bool] = None) -> int:
     """Perform non-interactive diagnostic inspection."""
-    console = Console(legacy_windows=False)
+    console = Console(legacy_windows=False, no_color=no_color)
 
     console.print(f"[bold magenta]GhostTrace AI v{__version__} — Diagnostics[/bold magenta]")
 
@@ -95,10 +100,10 @@ def run_health_check(config: GhostConfig) -> int:
         try:
             models = client.list_models()
             console.print(f" [bold green]✓[/bold green] Found {len(models)} local model(s): {', '.join(models)}")
-            if config.model in models:
+            if config.model in models or any(m.startswith(f"{config.model}:") for m in models):
                 console.print(f" [bold green]✓[/bold green] Target model '{config.model}' is installed.")
             else:
-                console.print(f" [bold yellow]![/bold yellow] Target model '{config.model}' is not in local library.")
+                console.print(f" [bold yellow]![/bold yellow] Target model '{config.model}' is not in local library. Run: ollama pull {config.model}")
         except Exception as e:
             console.print(f" [bold yellow]![/bold yellow] Failed to list models: {e}")
     else:
@@ -114,9 +119,9 @@ def run_health_check(config: GhostConfig) -> int:
     return 0 if is_alive else 1
 
 
-def run_one_shot_explain(cmd: str, config: GhostConfig) -> int:
+def run_one_shot_explain(cmd: str, config: GhostConfig, no_color: Optional[bool] = None) -> int:
     """Run non-interactive command analysis."""
-    shell = HauntedShell(config)
+    shell = HauntedShell(config, no_color=no_color)
     shell.cmd_explain(cmd)
     return 0
 
@@ -139,15 +144,16 @@ def main(args: Optional[list[str]] = None) -> int:
     if parsed.timeout:
         config.timeout_seconds = parsed.timeout
 
+    no_color = True if parsed.no_color else None
 
     if parsed.check_health:
-        return run_health_check(config)
+        return run_health_check(config, no_color=no_color)
 
     if parsed.explain:
-        return run_one_shot_explain(parsed.explain, config)
+        return run_one_shot_explain(parsed.explain, config, no_color=no_color)
 
     # Launch interactive haunted shell
-    shell = HauntedShell(config)
+    shell = HauntedShell(config, no_color=no_color)
     shell.run()
     return 0
 

@@ -49,7 +49,12 @@ class OllamaClient:
 
     def _validate_local_host(self, host: str) -> None:
         """Enforce that inference requests remain strictly local. Cloud endpoints are rejected."""
-        parsed = urlparse(host)
+        url_to_parse = host if "://" in host else f"http://{host}"
+        parsed = urlparse(url_to_parse)
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in ("http", "https"):
+            raise OllamaError(f"Unsupported URI scheme '{scheme}'. Only local HTTP is permitted.")
+
         hostname = (parsed.hostname or "").lower()
         if hostname not in self.ALLOWED_LOCAL_HOSTS:
             raise OllamaError(
@@ -79,10 +84,16 @@ class OllamaClient:
                     raise OllamaResponseError(f"Malformed JSON from Ollama tags endpoint: {err}") from err
                 models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
                 return models
+        except urllib.error.HTTPError as err:
+            raise OllamaResponseError(f"Ollama HTTP error {err.code}: {err.reason}") from err
         except urllib.error.URLError as err:
+            if isinstance(getattr(err, "reason", None), TimeoutError) or "timed out" in str(err).lower():
+                raise OllamaTimeoutError(f"Ollama request timed out after {self.timeout}s.") from err
             raise OllamaConnectionError(f"Cannot connect to Ollama at {self.host}: {err}") from err
         except TimeoutError as err:
             raise OllamaTimeoutError(f"Ollama request timed out after {self.timeout}s.") from err
+        except ConnectionRefusedError as err:
+            raise OllamaConnectionError(f"Cannot connect to Ollama at {self.host}: {err}") from err
         except OllamaError:
             raise
         except Exception as err:
@@ -145,13 +156,19 @@ class OllamaClient:
                 raise OllamaModelNotFoundError(
                     f"Model '{target_model}' was not found in local Ollama. Run: ollama pull {target_model}"
                 ) from err
-            raise OllamaError(f"Ollama HTTP error {err.code}: {err.reason}") from err
-        except (urllib.error.URLError, ConnectionRefusedError) as err:
+            raise OllamaResponseError(f"Ollama HTTP error {err.code}: {err.reason}") from err
+        except urllib.error.URLError as err:
+            if isinstance(getattr(err, "reason", None), TimeoutError) or "timed out" in str(err).lower():
+                raise OllamaTimeoutError(f"Ollama inference timed out after {to}s.") from err
             raise OllamaConnectionError(
                 f"Cannot connect to Ollama daemon at {self.host}. Verify Ollama is running."
             ) from err
         except TimeoutError as err:
             raise OllamaTimeoutError(f"Ollama inference timed out after {to}s.") from err
+        except ConnectionRefusedError as err:
+            raise OllamaConnectionError(
+                f"Cannot connect to Ollama daemon at {self.host}. Verify Ollama is running."
+            ) from err
         except OllamaError:
             raise
         except Exception as err:

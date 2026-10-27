@@ -1,77 +1,138 @@
-# GhostTrace AI — Safety Architecture & Security Policy 🛡️👻
+# GhostTrace AI — Security Architecture & Safety Policy 🛡️👻
 
-## 1. Executive Summary
+## 1. Executive Summary & Security Notice
 
-**GhostTrace AI** combines a local Large Language Model (e.g. `qwen2.5:1.5b` or `gemma3:4b` via Ollama) with a haunted terminal experience. While the interface features atmospheric horror and spectral commentary, **the underlying security posture is strictly deterministic, conservative, and uncompromised**.
+**GhostTrace AI** combines a local Large Language Model (**Gemma 3 4B** via Ollama) with an interactive, atmospheric terminal experience. While the interface features Gothic horror aesthetic and spectral commentary, **the security architecture is strictly deterministic, conservative, and air-gapped from model hallucinations**.
 
-Under no circumstances does model-generated text dictate execution logic, override system wards, or trigger automated commands.
+> [!CAUTION]
+> **NOT AN OPERATING SYSTEM SANDBOX OR HARDENED SHELL**
+> GhostTrace is an interactive cybersecurity-themed terminal and educational companion. It enforces strict deterministic parsing, allowlists, and execution filters before invoking system utilities. **It is NOT a kernel-level sandbox, hypervisor, or container (such as seccomp, AppArmor, or Docker).** Commands approved by the allowlist or confirmed by the user execute under the user's standard operating-system user permissions. Never run untrusted scripts or grant confirmation to sensitive commands without prior manual code inspection.
 
 ---
 
-## 2. Core Security Tenets
+## 2. Threat Model & Security Boundaries
+
+```
+[ User Input ]
+      │
+      ▼
+┌────────────────────────────────────────────────────────┐
+│ 1. Deterministic Input Classifier (safety.py)          │
+│    - BUILTIN: help, exit, clear, status, model, etc.   │
+│    - CONVERSATION: greetings, identity, ghost stories   │
+│    - COMMAND: OS system utilities & binaries           │
+│    * Security Gate: Metacharacters & destructive tokens│
+│      are ALWAYS forced to COMMAND category             │
+└──────┬────────────────────┬────────────────────┬───────┘
+       │ (BUILTIN)          │ (CONVERSATION)     │ (COMMAND)
+       ▼                    ▼                    ▼
+┌──────────────┐     ┌──────────────┐     ┌──────────────────────────────────┐
+│ Shell Method │     │ Ghost Engine │     │ 2. Deterministic Safety Engine   │
+│ (No Subproc) │     │  (Converse)  │     │    - Metacharacter Check         │
+└──────────────┘     │ [Display Only│     │    - Path-Qualified Reject       │
+                     │  No Runner]  │     │    - Destructive Denylist        │
+                     └──────────────┘     │    - Allowlist Enforcement       │
+                                          │    - Sensitivity Evaluation      │
+                                          └──────┬────────────────────┬──────┘
+                                                 │ (BLOCKED)          │ (ALLOWED)
+                                                 ▼                    ▼
+                                          ┌──────────────┐     ┌─────────────┐
+                                          │ EXECUTION    │     │ 3. Ghost AI │
+                                          │ REFUSED      │     │  Commentary │
+                                          │ (Zero Exec)  │     │ (Untrusted) │
+                                          └──────────────┘     └──────┬──────┘
+                                                                      │
+                                          ┌───────────────────────────┴──────┐
+                                          │ 4. User Confirmation Gate        │
+                                          │    [y/N] for Sensitive Ops       │
+                                          └───────────────────┬──────────────┘
+                                                              │ (Approved)
+                                                              ▼
+                                          ┌──────────────────────────────────┐
+                                          │ 5. CommandRunner (shell=False)   │
+                                          │    - Built-in safe emulations    │
+                                          │    - Subprocess execution        │
+                                          │    - Strict 15s timeout          │
+                                          └──────────────────────────────────┘
+```
 
 ### A. Separation of AI Commentary from Execution
-The local LLM functions exclusively as an **observer and commentator**. It is air-gapped from the execution pipeline:
+The local LLM (`gemma3:4b`) functions exclusively as an **untrusted passive commentator**. It is completely isolated from the execution pipeline:
 - **Model outputs are never parsed as commands.**
 - **Model outputs are never piped to the shell or OS.**
-- If the model produces malicious syntax, hallucinated instructions, or shell commands, they are simply rendered as text inside the Ghost Whisper display panel and discarded.
+- Model explanations cannot authorize execution or modify risk classifications.
+- If the model produces malicious syntax, hallucinated instructions, or shell commands, they are rendered as passive text inside the Ghost Whisper display panel and discarded.
+- `CommandRunner.execute()` only accepts verified `SafetyReport` instances generated by deterministic Python parsing, never model output strings.
 
-### B. Untrusted Input Sanitization
-User input, command arguments, and output streams are treated as untrusted strings:
-- Commands passed to the local LLM prompt are sanitized (newlines stripped, length-capped, isolated within quotes).
-- Filenames and directory paths discovered on disk are treated as passive data, never evaluated as shell instructions.
+### B. No `shell=True` Subprocess Execution
+GhostTrace **never** invokes `subprocess.run(..., shell=True)`:
+- Commands are split into clean argument tokens via `shlex.split(stripped, posix=False)` on Windows.
+- Arguments are passed as discrete token arrays directly to `subprocess.run(cmd_list, shell=False, timeout=15.0)`.
+- Shell interpreters (`cmd.exe`, `powershell.exe`, `/bin/sh`) are never invoked to evaluate command lines.
+- Internal terminal screen clearing (`clear`) uses Rich console buffer clearing (`Console.clear()`), avoiding `os.system()` shell calls.
 
-### C. Deterministic Guardrails
-All security decisions are made by **deterministic Python logic** before any inference or execution occurs:
-1. **Shell Metacharacter & Operator Blocking**:
-   The MVP prohibits shell chaining, pipelines, redirection, backgrounding, and command substitutions:
-   - Operators: `&&`, `||`, `;`, `|`, `>`, `>>`, `<`, `` ` ``, `$()`, `${}`, `&`, `\n`, `\r`
-   - Attempting to chain commands (e.g. `ls && cat secret.txt`) results in immediate `RiskLevel.BLOCKED`.
-2. **Destructive Command Denylist**:
-   Commands that delete data, format drives, or shred storage are permanently blocked:
-   - Denied: `rm`, `del`, `erase`, `rmdir`, `rd`, `format`, `dd`, `mkfs.*`, `shred`, `wipe`, `diskpart`, `Remove-Item`, fork bombs (`:(){ :|:& };:`).
-3. **Strict Allowlist Enforcement**:
-   In standard safe mode, only pre-approved system utilities and development tools can run:
-   - Navigation & inspection: `ls`, `dir`, `pwd`, `cd`, `cat`, `type`, `head`, `tail`, `grep`, `findstr`, `echo`, `date`, `time`, `whoami`, `hostname`, `uname`, `df`, `du`, `uptime`, `wc`.
-   - Tooling: `git`, `python`, `python3`, `pip`, `pytest`, `ollama`, `env`, `which`, `where`.
-   - Any unlisted binary (e.g. `curl`, `wget`, `nc`, `bash`, `powershell`) is blocked.
-4. **Sensitive Operations Confirmation**:
-   Commands that write repository state or execute external scripts (`python`, `pip`, `git commit`, `git push`, `git checkout`) require explicit user confirmation (`[y/N]`) before execution.
+### C. Forbidden Shell Operators & Injection Prevention
+The parser rejects any command containing shell chaining, redirection, pipelines, command substitution, backgrounding, or null byte injections:
+- **Forbidden Operators**: `&&`, `||`, `;`, `|`, `>`, `>>`, `<`, `` ` ``, `$()`, `${}`, `&`, `\n`, `\r`, `\0`.
+- Chaining attempts (e.g., `ls && whoami`, `dir&calc.exe`, `echo a; rm b`) are blocked immediately with `RiskLevel.BLOCKED`.
+
+### D. Path-Qualified Binary Execution Prevention
+Allowlisted commands are standard system utilities expected from the system `PATH`.
+- Direct relative or absolute path execution (e.g. `./ls`, `../ls`, `C:\evil\ls.exe`, `/bin/sh`, `.\python.exe`) is **strictly prohibited**.
+- Path-qualified targets are rejected with `RiskLevel.BLOCKED` to prevent attackers from placing arbitrary binaries in local folders and evading the allowlist by naming them after approved tools.
+- On Windows, bare executable names ending in `.exe` without path separators (e.g., `python.exe`) are permitted if they match the allowlist.
+
+### E. Command Proxy & Wrapper Restrictions
+- Commands like `env` are restricted solely to passive environment inspection (e.g. `env`, `env --version`).
+- Using `env` as an execution proxy to launch other commands (e.g., `env rm -rf /`, `env ls`) is strictly blocked.
+
+### F. Destructive Command Denylist
+Commands designed to delete filesystem trees, format partitions, or exhaust system resources are permanently blocked:
+- **Blocked**: `rm`, `rmdir`, `unlink`, `del`, `delete`, `erase`, `rd`, `format`, `diskpart`, `fdisk`, `parted`, `dd`, `mkfs`, `shred`, `wipe`, `drop`, `truncate`, `remove-item`, `clear-disk`, `format-volume`, `invoke-expression`, `iex`, and fork bomb patterns (`:(){ :|:& };:`).
+
+### G. Strict Allowlist Enforcement
+In standard safe mode (`safe_mode=True`), only pre-approved system utilities and development tools can run:
+- **Filesystem & Inspection**: `ls`, `dir`, `pwd`, `cd`, `cat`, `type`, `head`, `tail`, `grep`, `findstr`, `echo`, `date`, `time`, `whoami`, `hostname`, `uname`, `df`, `du`, `uptime`, `wc`.
+- **Development & Tooling**: `git`, `python`, `python3`, `pip`, `pytest`, `ollama`, `env`, `printenv`, `which`, `where`.
+- Any utility outside this registry (e.g. `curl`, `wget`, `nc`, `powershell`, `cmd`, `bash`, `certutil`) is refused with `EXECUTION REFUSED`.
+
+### H. Sensitive Operations Confirmation Gate
+Operations that write repository state, install packages, or execute external scripts require explicit user confirmation (`[y/N]`):
+- `python`, `python3`, `pip`, `pytest`.
+- `git commit`, `git push`, `git merge`, `git rebase`, `git reset`, `git checkout`, `git branch`, `git stash`, `git clean`, `git rm`, `git config`.
+
+### I. Conversational Mode Isolation
+- Inputs categorized as `CONVERSATION` (`hi`, `who are you?`, `tell me a ghost story`) are routed exclusively to `GhostEngine.converse()`.
+- Conversational inputs **never** invoke the operating system command runner.
+- Inputs containing destructive command names or forbidden operators are conservatively forced into `COMMAND` mode and blocked by safety wards.
 
 ---
 
-## 3. Execution Model (`shell=False`)
+## 3. Local-Only AI Client Security
 
-GhostTrace **never** invokes `subprocess.run(..., shell=True)`:
-- Commands are split into clean argument lists via `shlex.split`.
-- On Windows, `posix=False` is used to preserve backslashes in Windows file paths without shell evaluation.
-- Commands are executed directly via `subprocess.run(parsed_args, shell=False, timeout=15.0)`.
-- Cross-platform built-in emulations are provided for `cd`, `pwd`, `ls`, `dir`, `cat`, `type`, `echo`, `whoami`, `date` to ensure consistent, secure behavior even if native shell built-ins are absent from system PATH.
+### Loopback Enforcement
+GhostTrace communicates with Ollama strictly over loopback interfaces:
+- **Allowed Hosts**: `localhost`, `127.0.0.1`, `::1`.
+- Any external hostname, cloud API (e.g., `api.openai.com`), or remote IP address is rejected on initialization with an `OllamaError`.
+- No cloud fallback exists. If Ollama is offline, GhostTrace falls back to its deterministic in-memory `SPECTRAL_ECHOES` and `CONVERSATIONAL_ECHOES` dictionaries.
+
+### Air-Gapped Offline Mode (`--offline`)
+- Running with `--offline` completely disables all HTTP requests.
+- Startup banner rendering, status commands, and AI commentary generate zero socket or HTTP connections.
 
 ---
 
 ## 4. Privilege Boundary & Administrator Warnings
 
-Running GhostTrace with elevated privileges (Administrator on Windows, Root on Linux/macOS) is strongly discouraged.
-- GhostTrace detects elevated execution via `ctypes.windll.shell32.IsUserAnAdmin()` (Windows) or `os.geteuid() == 0` (Unix).
-- When elevated, GhostTrace outputs a high-visibility warning banner urging the user to drop privileges.
+Running GhostTrace with elevated administrative privileges (`Administrator` on Windows, `root` on POSIX) increases the blast radius of any user-approved script.
+- GhostTrace detects elevation on startup via `ctypes.windll.shell32.IsUserAnAdmin()` (Windows) or `os.geteuid() == 0` (POSIX).
+- When running elevated, GhostTrace prints a prominent warning banner recommending standard user space.
 
 ---
 
-## 5. Security Scope & MVP Limitations
+## 5. Security Limitations & Known Risks
 
-> [!IMPORTANT]
-> **GhostTrace MVP is an interactive guidance layer with deterministic guardrails, NOT an operating system sandbox or hypervisor.**
-
-- It does not employ kernel-level cgroups, seccomp filters, AppArmor profiles, or containerization.
-- While it prevents unauthorized command execution, script execution allowed by the user (e.g. `python script.py`) executes with the user's standard OS permissions.
-- Always review scripts and external code before granting confirmation.
-
----
-
-## 6. Privacy & Offline Guarantees
-
-- **100% Local Inference**: GhostTrace connects solely to `http://localhost:11434` (Ollama).
-- **No Cloud Fallback**: Cloud APIs (OpenAI, Anthropic, Google Cloud, AWS) are completely absent from the codebase.
-- **Zero Telemetry**: No analytics, phone-home beacons, or usage tracking.
-- **Offline Deterministic Fallback**: In air-gapped environments or when Ollama is stopped, GhostTrace functions using its offline "Spectral Echoes" library with zero network calls.
+1. **User-Authorized Code Execution**: When a user authorizes `python script.py`, the Python interpreter executes with the user's OS permissions. Malicious code within `script.py` can delete files, make network requests, or spawn processes.
+2. **Environment Variable Inspection**: Running `env` or `printenv` prints environment variables to standard output, which may display sensitive tokens if present in the user's environment.
+3. **Platform Scope**: GhostTrace is engineered and tested primarily on **Windows 11 with PowerShell**. Cross-platform emulations for `ls`, `cat`, and `cd` exist in Python, but POSIX environments have not been certified for this release.
+4. **Denial of Service**: Long-running commands (e.g., `git clone` or a python script) are bound to a 15-second timeout, but heavy CPU usage within that window is permitted.

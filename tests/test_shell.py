@@ -295,3 +295,50 @@ def test_conversational_model_failure_produces_local_fallback(shell: HauntedShel
         titles = [str(p.title) for p in panels]
         assert any("GHOST CONVERSATION" in t for t in titles)
 
+
+def test_offline_mode_makes_zero_http_requests():
+    """Verify that --offline (offline_only=True) makes zero HTTP network requests across all commands."""
+    config = GhostConfig(offline_only=True, animations_enabled=False)
+    shell = HauntedShell(config)
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        shell.print_banner()
+        shell.cmd_status()
+        shell.cmd_model("")
+        shell.handle_input("hi")
+        shell.handle_input("who are you?")
+        shell.handle_input("tell me a ghost story")
+        shell.handle_input("ls")
+        mock_urlopen.assert_not_called()
+
+
+def test_cmd_clear_uses_console_clear_not_os_system(shell: HauntedShell):
+    """Verify clear command clears console directly without invoking os.system shell."""
+    with patch.object(shell.console, "clear") as mock_clear, patch("os.system") as mock_os_system, patch.object(
+        shell, "print_banner"
+    ):
+        shell.cmd_clear()
+        mock_clear.assert_called_once()
+        mock_os_system.assert_not_called()
+
+
+def test_banner_shows_model_pull_instruction_when_missing():
+    """Verify banner outputs clear 'ollama pull' instructions when model is missing from library."""
+    config = GhostConfig(offline_only=False, animations_enabled=False)
+    shell = HauntedShell(config)
+
+    shell.client.is_available = MagicMock(return_value=True)
+    shell.client.list_models = MagicMock(return_value=["other_model:latest"])
+
+    with patch.object(shell.console, "print") as mock_print:
+        shell.print_banner()
+        all_printed = " ".join(str(call) for call in mock_print.call_args_list)
+        assert f"ollama pull {config.model}" in all_printed
+
+
+def test_no_color_flag_disables_ansi_styling():
+    """Verify no_color=True creates Console with no_color active."""
+    shell = HauntedShell(no_color=True)
+    assert shell.console.no_color is True
+
+
