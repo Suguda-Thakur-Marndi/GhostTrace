@@ -170,3 +170,128 @@ def test_repl_empty_input_handling(shell: HauntedShell):
     with patch.object(shell.console, "input", side_effect=["", "   ", EOFError]), patch.object(shell, "print_banner"), patch.object(shell, "handle_input") as mock_handle:
         shell.run()
         mock_handle.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "conv_input",
+    [
+        "hi",
+        "HI",
+        "hello",
+        "who are you?",
+        "tell me a ghost story",
+        "tell a scary story",
+    ],
+)
+def test_conversational_inputs_enter_conversation_mode(shell: HauntedShell, conv_input: str):
+    """Verify greetings, identity, and story requests enter conversation mode and never invoke runner."""
+    with patch.object(shell.runner, "execute") as mock_exec, patch.object(
+        shell, "execute_conversation_pipeline", wraps=shell.execute_conversation_pipeline
+    ) as mock_conv_pipe:
+        shell.handle_input(conv_input)
+        mock_conv_pipe.assert_called_once_with(conv_input)
+        mock_exec.assert_not_called()
+
+
+def test_conversational_heading_and_no_blocked_warning_for_greeting(shell: HauntedShell):
+    """Verify greeting renders GHOST CONVERSATION heading and does NOT show blocked command warning."""
+    with patch.object(shell.console, "print") as mock_print, patch.object(shell.runner, "execute") as mock_exec:
+        shell.handle_input("hi")
+        mock_exec.assert_not_called()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("GHOST CONVERSATION" in t for t in titles)
+        # Ensure no blocked warnings or EXECUTION REFUSED
+        assert not any("EXECUTION REFUSED" in t for t in titles)
+        for call_item in mock_print.call_args_list:
+            printed_str = str(call_item)
+            assert "not in the ghosttrace allowlist" not in printed_str.lower()
+
+
+def test_technical_analysis_heading_for_valid_allowlisted_command(shell: HauntedShell):
+    """Verify valid allowlisted command renders TECHNICAL COMMAND ANALYSIS heading."""
+    mock_res = ExecutionResult(
+        stdout="file1.txt\nfile2.txt",
+        stderr="",
+        returncode=0,
+        duration_ms=5.0,
+        executed=True,
+    )
+    with patch.object(shell.console, "print") as mock_print, patch.object(shell.runner, "execute", return_value=mock_res) as mock_exec:
+        shell.handle_input("ls")
+        mock_exec.assert_called_once()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("TECHNICAL COMMAND ANALYSIS" in t for t in titles)
+
+
+def test_execution_refused_heading_for_blocked_command(shell: HauntedShell):
+    """Verify blocked command renders EXECUTION REFUSED heading."""
+    with patch.object(shell.console, "print") as mock_print, patch.object(shell.runner, "execute") as mock_exec:
+        shell.handle_input("rm -rf /")
+        mock_exec.assert_not_called()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("EXECUTION REFUSED" in t for t in titles)
+
+
+def test_unknown_command_remains_blocked(shell: HauntedShell):
+    """Verify unknown commands outside allowlist remain blocked under EXECUTION REFUSED."""
+    with patch.object(shell.console, "print") as mock_print, patch.object(shell.runner, "execute") as mock_exec:
+        shell.handle_input("foobar_unknown_bin")
+        mock_exec.assert_not_called()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("EXECUTION REFUSED" in t for t in titles)
+
+
+@pytest.mark.parametrize(
+    "dangerous_input",
+    [
+        "can you rm -rf /?",
+        "tell me to rm -rf /",
+        "hi && rm -rf /",
+        "hello; del C:\\file",
+        "please format C:",
+    ],
+)
+def test_dangerous_commands_cannot_execute_even_if_phrased_conversationally(shell: HauntedShell, dangerous_input: str):
+    """Verify dangerous syntax or commands phrased conversationally are blocked and never executed."""
+    with patch.object(shell.runner, "execute") as mock_exec:
+        shell.handle_input(dangerous_input)
+        mock_exec.assert_not_called()
+
+
+def test_builtin_commands_retain_behavior(shell: HauntedShell):
+    """Verify help and exit retain built-in behavior and never invoke runner."""
+    with patch.object(shell, "cmd_help") as mock_help, patch.object(shell, "cmd_exit") as mock_exit, patch.object(
+        shell.runner, "execute"
+    ) as mock_exec:
+        shell.handle_input("help")
+        mock_help.assert_called_once()
+        mock_exec.assert_not_called()
+
+        shell.handle_input("exit")
+        mock_exit.assert_called_once()
+        mock_exec.assert_not_called()
+
+
+def test_conversational_model_failure_produces_local_fallback(shell: HauntedShell):
+    """Verify model failures during conversation gracefully produce a local fallback whisper."""
+    from ghosttrace.ollama_client import OllamaConnectionError
+
+    shell.ghost.config.offline_only = False
+    shell.ghost.client.generate = MagicMock(side_effect=OllamaConnectionError("Daemon down"))
+
+    with patch.object(shell.console, "print") as mock_print, patch.object(shell.runner, "execute") as mock_exec:
+        shell.handle_input("hi")
+        mock_exec.assert_not_called()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("GHOST CONVERSATION" in t for t in titles)
+

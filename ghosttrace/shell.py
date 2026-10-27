@@ -19,7 +19,7 @@ from ghosttrace.command_runner import CommandRunner
 from ghosttrace.config import PERSONALITIES, STARTUP_MESSAGES, GhostConfig
 from ghosttrace.ghost import GhostEngine, GhostWhisper
 from ghosttrace.ollama_client import OllamaClient
-from ghosttrace.safety import RiskLevel, SafetyEngine, SafetyReport
+from ghosttrace.safety import InputCategory, RiskLevel, SafetyEngine, SafetyReport, classify_input
 
 ASCII_BANNER = r"""
        .-.
@@ -123,29 +123,38 @@ class HauntedShell:
                 self.console.print(f"[bold red]Spectral fault:[/bold red] {err}")
 
     def handle_input(self, raw_input: str) -> None:
-        """Process user input, routing between built-in shell commands and system commands."""
-        parts = raw_input.split(maxsplit=1)
-        command_key = parts[0].lower()
-        arg_str = parts[1] if len(parts) > 1 else ""
+        """Process user input, deterministically routing between built-ins, conversation, and commands."""
+        category = classify_input(raw_input)
 
-        # Internal shell commands
-        if command_key in ("exit", "quit"):
-            self.cmd_exit()
-        elif command_key == "help":
-            self.cmd_help()
-        elif command_key in ("clear", "cls"):
-            self.cmd_clear()
-        elif command_key == "status":
-            self.cmd_status()
-        elif command_key == "model":
-            self.cmd_model(arg_str)
-        elif command_key == "personality":
-            self.cmd_personality(arg_str)
-        elif command_key == "explain":
-            self.cmd_explain(arg_str)
+        if category == InputCategory.BUILTIN:
+            parts = raw_input.split(maxsplit=1)
+            command_key = parts[0].lower()
+            arg_str = parts[1] if len(parts) > 1 else ""
+
+            if command_key in ("exit", "quit"):
+                self.cmd_exit()
+            elif command_key == "help":
+                self.cmd_help()
+            elif command_key in ("clear", "cls"):
+                self.cmd_clear()
+            elif command_key == "status":
+                self.cmd_status()
+            elif command_key == "model":
+                self.cmd_model(arg_str)
+            elif command_key == "personality":
+                self.cmd_personality(arg_str)
+            elif command_key == "explain":
+                self.cmd_explain(arg_str)
+        elif category == InputCategory.CONVERSATION:
+            self.execute_conversation_pipeline(raw_input)
         else:
             # System command execution flow
             self.execute_command_pipeline(raw_input)
+
+    def execute_conversation_pipeline(self, raw_input: str) -> None:
+        """Process conversational input without ever invoking the OS command runner."""
+        whisper = self.ghost.converse(raw_input)
+        self._render_ghost_conversation(whisper)
 
     def cmd_exit(self) -> None:
         """Leave the haunted terminal."""
@@ -281,9 +290,9 @@ class HauntedShell:
         if report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED):
             self.console.print(
                 Panel(
-                    f"[bold red]EXECUTION REFUSED BY SAFETY WARDS[/bold red]\n"
-                    f"[white]{report.reason}[/white]\n"
-                    f"[dim]Command was suppressed before it could reach the system.[/dim]",
+                    f"[bold red]Refused by safety wards:[/bold red] {report.reason}\n"
+                    f"[dim]Command was suppressed before it could reach the operating system.[/dim]",
+                    title="[bold red]EXECUTION REFUSED[/bold red]",
                     border_style="red",
                     box=box.ROUNDED,
                 )
@@ -307,6 +316,28 @@ class HauntedShell:
         # 7. Render output
         self._render_execution_result(result)
 
+    def _render_ghost_conversation(self, whisper: GhostWhisper) -> None:
+        """Render conversational ghost response with distinct GHOST CONVERSATION heading."""
+        source_badge = (
+            f"[bold green]Ollama ({whisper.model})[/bold green]"
+            if whisper.source == "ollama"
+            else "[dim yellow]Spectral Echo (Offline/Fallback)[/dim yellow]"
+        )
+        latency = f"[dim]{whisper.latency_ms:.0f}ms[/dim]"
+        notice = f"\n[dim red]Notice: {whisper.error_notice}[/dim red]" if whisper.error_notice else ""
+
+        reply_text = whisper.commentary or whisper.text
+        content = f"[italic green]\"{reply_text}\"[/italic green]{notice}"
+
+        self.console.print(
+            Panel(
+                content,
+                title=f"[bold green]👻 GHOST CONVERSATION[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}",
+                border_style="green",
+                box=box.ROUNDED,
+            )
+        )
+
     def _render_technical_analysis(self, report: SafetyReport) -> None:
         """Render technical explanation and risk classification panel with distinct visual styles."""
         risk_styles = {
@@ -327,7 +358,7 @@ class HauntedShell:
         self.console.print(
             Panel(
                 body,
-                title=f"[dim]Technical Command Analysis[/dim] [dim]•[/dim] [{color}]{badge}[/{color}]",
+                title=f"[bold]TECHNICAL COMMAND ANALYSIS[/bold] [dim]•[/dim] [{color}]{badge}[/{color}]",
                 border_style=color,
                 box=box.ROUNDED,
             )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from ghosttrace.safety import RiskLevel, SafetyEngine
+from ghosttrace.safety import InputCategory, RiskLevel, SafetyEngine, classify_input
 
 
 @pytest.fixture
@@ -139,3 +139,96 @@ def test_sensitive_commands_require_confirmation(safety: SafetyEngine, sensitive
     assert report.risk_level == RiskLevel.SENSITIVE
     assert report.is_allowed
     assert report.requires_confirmation
+
+
+@pytest.mark.parametrize(
+    "builtin_input",
+    [
+        "help",
+        "HELP",
+        "exit",
+        "EXIT",
+        "quit",
+        "clear",
+        "cls",
+        "status",
+        "model",
+        "model gemma3:4b",
+        "personality",
+        "personality cyber_poltergeist",
+        "explain ls",
+    ],
+)
+def test_classify_builtin_commands(builtin_input: str):
+    """Verify built-in interactive commands are deterministically classified as BUILTIN."""
+    assert classify_input(builtin_input) == InputCategory.BUILTIN
+
+
+@pytest.mark.parametrize(
+    "conversational_input",
+    [
+        "hi",
+        "HI",
+        "hello",
+        "Hello!",
+        "hey",
+        "hey there",
+        "greetings",
+        "good morning",
+        "who are you?",
+        "who are you",
+        "what are you?",
+        "what is your name?",
+        "are you a ghost?",
+        "tell me a ghost story",
+        "tell me a scary story",
+        "tell a ghost story",
+        "how are you?",
+        "why are you here?",
+        "thank you",
+        "thanks!",
+        "bye",
+    ],
+)
+def test_classify_conversational_inputs(conversational_input: str):
+    """Verify greetings, identity questions, and ghost story requests are classified as CONVERSATION."""
+    assert classify_input(conversational_input) == InputCategory.CONVERSATION
+
+
+@pytest.mark.parametrize(
+    "command_input",
+    [
+        "ls",
+        "ls -la",
+        "dir",
+        "pwd",
+        "whoami",
+        "cat file.txt",
+        "git status",
+        "python main.py",
+        "unknowncmd",
+        "nonexistent_binary --flag",
+    ],
+)
+def test_classify_shell_commands(command_input: str):
+    """Verify allowlisted and unknown OS utilities are classified as COMMAND."""
+    assert classify_input(command_input) == InputCategory.COMMAND
+
+
+@pytest.mark.parametrize(
+    "dangerous_conversational_input",
+    [
+        "hi && rm -rf /",
+        "hello; del C:\\secret",
+        "can you rm -rf /?",
+        "tell me to rm -rf /",
+        "tell me how to delete everything",
+        "format C: please",
+        "hey | cat /etc/shadow",
+        "who are you `cat /etc/passwd`",
+    ],
+)
+def test_classify_dangerous_inputs_phrased_conversationally(dangerous_conversational_input: str):
+    """Verify dangerous syntax or destructive commands phrased conversationally are strictly classified as COMMAND."""
+    assert classify_input(dangerous_conversational_input) == InputCategory.COMMAND
+

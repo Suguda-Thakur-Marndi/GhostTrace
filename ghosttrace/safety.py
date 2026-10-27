@@ -19,6 +19,15 @@ class RiskLevel(str, enum.Enum):
     MALFORMED = "MALFORMED"
 
 
+class InputCategory(str, enum.Enum):
+    """Categories of terminal input."""
+
+    BUILTIN = "BUILTIN"
+    CONVERSATION = "CONVERSATION"
+    COMMAND = "COMMAND"
+
+
+
 # Dangerous shell metacharacters forbidden in MVP
 FORBIDDEN_OPERATORS: List[str] = [
     "&&",
@@ -41,6 +50,7 @@ DESTRUCTIVE_COMMANDS: Set[str] = {
     "rmdir",
     "unlink",
     "del",
+    "delete",
     "erase",
     "rd",
     "format",
@@ -80,6 +90,157 @@ SENSITIVE_GIT_SUBCOMMANDS: Set[str] = {
     "stash",
     "clean",
 }
+
+# Built-in interactive shell commands
+BUILTIN_COMMANDS: Set[str] = {
+    "help",
+    "exit",
+    "quit",
+    "clear",
+    "cls",
+    "status",
+    "model",
+    "personality",
+    "explain",
+}
+
+# Conversational recognition keywords & phrases
+GREETING_WORDS: Set[str] = {
+    "hi",
+    "hello",
+    "hey",
+    "greetings",
+    "howdy",
+    "hola",
+    "yo",
+    "sup",
+    "good morning",
+    "good evening",
+    "good afternoon",
+    "salutations",
+}
+
+IDENTITY_PHRASES: Set[str] = {
+    "who are you",
+    "what are you",
+    "what is your name",
+    "what's your name",
+    "who made you",
+    "who created you",
+    "are you a ghost",
+    "are you real",
+    "where are you",
+    "why are you here",
+    "how are you",
+    "how are you doing",
+    "how do you feel",
+    "what do you do",
+}
+
+STORY_KEYWORDS: Set[str] = {
+    "ghost story",
+    "scary story",
+    "horror story",
+    "spooky story",
+    "tell me a story",
+    "tell a story",
+    "tell me a ghost story",
+    "tell a ghost story",
+    "tell me something scary",
+}
+
+QUESTION_STARTERS: Set[str] = {
+    "who",
+    "what",
+    "why",
+    "how",
+    "when",
+    "where",
+    "can",
+    "could",
+    "would",
+    "do",
+    "does",
+    "did",
+    "is",
+    "are",
+    "am",
+}
+
+PLEASANTRIES: Set[str] = {
+    "thanks",
+    "thank you",
+    "bye",
+    "goodbye",
+    "good night",
+    "goodnight",
+    "see ya",
+    "see you",
+}
+
+
+def classify_input(raw_input: str) -> InputCategory:
+    """Classify user input into BUILTIN, CONVERSATION, or COMMAND deterministically."""
+    stripped = raw_input.strip()
+    if not stripped:
+        return InputCategory.COMMAND
+
+    lowered = stripped.lower()
+    parts = lowered.split()
+    first_token = parts[0] if parts else ""
+
+    # 1. Built-in application commands
+    if first_token in BUILTIN_COMMANDS:
+        return InputCategory.BUILTIN
+
+    # 2. Strict security guards:
+    # Metacharacters, pipelines, redirection, chaining, or backgrounding are ALWAYS treated as COMMAND
+    for op in FORBIDDEN_OPERATORS:
+        if op in lowered:
+            return InputCategory.COMMAND
+
+    if lowered.endswith("&") or " & " in lowered:
+        return InputCategory.COMMAND
+
+    # Destructive command tokens are ALWAYS treated as COMMAND
+    if first_token in DESTRUCTIVE_COMMANDS:
+        return InputCategory.COMMAND
+
+    if any(tok in DESTRUCTIVE_COMMANDS for tok in parts):
+        return InputCategory.COMMAND
+
+    # 3. Conversational patterns
+    stripped_punc = re.sub(r"[!?,.]+$", "", lowered).strip()
+
+    # Direct greetings
+    if stripped_punc in GREETING_WORDS:
+        return InputCategory.CONVERSATION
+
+    if any(stripped_punc.startswith(f"{g} ") for g in GREETING_WORDS):
+        return InputCategory.CONVERSATION
+
+    # Identity questions
+    if any(phrase in stripped_punc for phrase in IDENTITY_PHRASES):
+        return InputCategory.CONVERSATION
+
+    # Story requests
+    if any(kw in lowered for kw in STORY_KEYWORDS):
+        return InputCategory.CONVERSATION
+
+    if lowered.startswith("tell me") or lowered.startswith("tell a"):
+        return InputCategory.CONVERSATION
+
+    # Pleasantries
+    if stripped_punc in PLEASANTRIES:
+        return InputCategory.CONVERSATION
+
+    # Questions addressed to the ghost (ends with '?' and has multiple words starting with question word)
+    if stripped.endswith("?") and len(parts) > 1 and first_token in QUESTION_STARTERS:
+        return InputCategory.CONVERSATION
+
+    # 4. Standard system / shell commands
+    return InputCategory.COMMAND
+
 
 
 @dataclass

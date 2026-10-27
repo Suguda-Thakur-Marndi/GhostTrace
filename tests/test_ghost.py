@@ -214,3 +214,107 @@ def test_model_output_never_executed_as_command(sample_report: SafetyReport):
     with pytest.raises(AttributeError):
         # Passing whisper to runner.execute fails because it is not a SafetyReport
         runner.execute(whisper)  # type: ignore
+
+
+def test_converse_online_greeting():
+    """Verify converse returns atmospheric greeting via Ollama."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.return_value = "Greetings, mortal traveler. The terminal awaits."
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("hi")
+
+    assert whisper.source == "ollama"
+    assert whisper.model == "gemma3:4b"
+    assert "Greetings, mortal traveler" in whisper.text
+    assert whisper.error_notice is None
+    assert whisper.latency_ms >= 0
+
+
+def test_converse_online_identity():
+    """Verify converse returns fictional identity via Ollama."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.return_value = "I am GhostTrace, an ethereal spirit inhabiting this shell's memory."
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("who are you?")
+
+    assert whisper.source == "ollama"
+    assert "GhostTrace" in whisper.text
+
+
+def test_converse_online_ghost_story():
+    """Verify converse returns short horror story via Ollama."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.return_value = "Late one midnight, a forgotten daemon woke from sector 0."
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("tell me a ghost story")
+
+    assert whisper.source == "ollama"
+    assert "Late one midnight" in whisper.text
+
+
+@pytest.mark.parametrize(
+    "msg,expected_tokens",
+    [
+        ("hi", ["greetings", "mortal", "phosphor", "whisper", "hello", "static"]),
+        ("who are you?", ["ghosttrace", "phantom", "machine", "memory", "keystroke"]),
+        ("tell me a ghost story", ["midnight", "pid", "daemon", "array", "stack", "terminal"]),
+    ],
+)
+def test_converse_offline_fallback(msg: str, expected_tokens: list[str]):
+    """Verify converse deterministic fallback in offline mode."""
+    config = GhostConfig(offline_only=True)
+    engine = GhostEngine(config=config)
+
+    whisper = engine.converse(msg)
+    assert whisper.source == "spectral_echo"
+    assert whisper.model == "deterministic_offline"
+    assert any(tok in whisper.text.lower() for tok in expected_tokens)
+
+
+def test_converse_fallback_on_connection_error():
+    """Verify converse falls back gracefully on OllamaConnectionError."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.side_effect = OllamaConnectionError("Daemon unreachable")
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("hi")
+
+    assert whisper.source == "spectral_echo"
+    assert "unreachable" in whisper.error_notice.lower()
+    assert len(whisper.text) > 0
+
+
+def test_converse_fallback_on_timeout():
+    """Verify converse falls back gracefully on OllamaTimeoutError."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.side_effect = OllamaTimeoutError("Inference timed out")
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("tell me a ghost story")
+
+    assert whisper.source == "spectral_echo"
+    assert "timed out" in whisper.error_notice.lower()
+    assert len(whisper.text) > 0
+
+
+def test_converse_fallback_on_model_not_found():
+    """Verify converse falls back gracefully on OllamaModelNotFoundError."""
+    config = GhostConfig()
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.side_effect = OllamaModelNotFoundError("Model gemma3:4b not found")
+
+    engine = GhostEngine(config=config, client=mock_client)
+    whisper = engine.converse("who are you?")
+
+    assert whisper.source == "spectral_echo"
+    assert "missing from ollama" in whisper.error_notice.lower()
+    assert len(whisper.text) > 0
+

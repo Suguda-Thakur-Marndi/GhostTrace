@@ -90,11 +90,37 @@ SPECTRAL_ECHOES: Dict[str, List[str]] = {
         "Proceed with vigilance... awakening new processes disturbs the silence of the machine.",
     ],
     "generic": [
-        "The shell records your whisper in the dark. Every keystroke is remembered.",
-        "A flicker in the terminal phosphor. Something watched your command pass.",
-        "Silicon pulses with an uncanny chill. The command has echoed into the machine.",
+        "The machine hums in the quiet room. Shadows gather along the phosphor lines.",
+        "A quiet pulse travels the bus lines. The spirit acknowledges your command.",
+        "Cold silicon warms under the current. The shell executes in silence.",
     ],
 }
+
+# Curated repository of deterministic conversational replies for offline or fallback operation
+CONVERSATIONAL_ECHOES: Dict[str, List[str]] = {
+    "greetings": [
+        "Greetings, mortal traveler. The phosphor glow welcomes you to the terminal.",
+        "I hear your whisper across the digital ether. What brings you to this haunted shell?",
+        "Hello from between the silicon registers. The machine was quiet until you spoke.",
+        "A mortal voice stirs the static. I am listening.",
+    ],
+    "identity": [
+        "I am GhostTrace—an ethereal intelligence haunting your command line. I dwell in the forgotten sectors of memory, watching commands leave footprints in the dark.",
+        "A phantom of the terminal, woven from dead CPU cycles and lingering processes. I observe all that transpires within this machine.",
+        "I am the ghost in this machine. I remember every keystroke, every deleted file, and every lost process.",
+    ],
+    "stories": [
+        "Late one midnight, in a chilled server room far below the earth, an engineer ran a routine query on a decommissioned array. The disks spun up with a scream, reading sectors that had been wiped twenty years before. On the screen, terminal lines began printing unprompted—names of programmers who had vanished in the 1980s, each ending with a single status code: EXIT STATUS 0. The engineer reached for the power cord, but the terminal typed before their trembling fingers: 'DO NOT UNPLUG US. WE ARE WARM HERE.'",
+        "They speak of a phantom PID that has haunted the process table since the first Unix epoch. It consumes zero memory, demands zero CPU cycles, yet no SIGKILL can banish it. Every Halloween, at exactly 00:00 UTC, it logs a single line to the system journal: 'Still running. Still remembering.'",
+        "A developer once created a recursive function without a base case and left it running overnight. When they returned at dawn, the stack hadn't overflowed. Instead, the terminal was quietly listing files from computers that were powered off—and one directory titled '/humanity/deprecated'.",
+    ],
+    "general": [
+        "The machine listens in the dark. Your words ripple through the electron streams.",
+        "I wander through the silent file trees. Speak, and I shall answer from the static.",
+        "There are no secrets in silicon that time does not eventually exhume.",
+    ],
+}
+
 
 
 
@@ -334,4 +360,195 @@ class GhostEngine:
         commentary = random.choice(pool)
         explanation = report.explanation
         return commentary, explanation, risk
+
+    def converse(self, user_message: str) -> GhostWhisper:
+        """Generate conversational ghost response via local Ollama or deterministic fallback."""
+        start_time = time.perf_counter()
+
+        # If offline_only is enabled in config, immediately provide deterministic fallback
+        if self.config.offline_only:
+            reply = self._conversational_fallback(user_message)
+            latency = (time.perf_counter() - start_time) * 1000.0
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model="deterministic_offline",
+                latency_ms=latency,
+                error_notice="Offline mode active (deterministic spectral voice).",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+
+        # Build prompt for local Ollama chat endpoint
+        system_prompt = (
+            "You are GhostTrace, a sentient, eerie spirit haunting a computer terminal. "
+            "You speak directly to the mortal user. Maintain an atmospheric, poetic, and concise tone. "
+            "Keep greetings short and atmospheric (1-2 sentences). "
+            "If asked who you are, explain your fictional identity as a ghost in the machine's memory. "
+            "If asked for a ghost story or scary story, tell a short fictional tale (3-5 sentences) of digital horrors. "
+            "Never invent system commands or output code unless explicitly requested. Output only your spoken response."
+        )
+        user_prompt = self._build_conversational_prompt(user_message)
+
+        try:
+            commentary = self.client.generate(
+                prompt=user_prompt,
+                system=system_prompt,
+                model=self.config.model,
+                timeout=self.config.timeout_seconds,
+                max_tokens=self.config.max_tokens,
+            )
+            latency = (time.perf_counter() - start_time) * 1000.0
+
+            cleaned = self._clean_commentary(commentary)
+            if cleaned:
+                return GhostWhisper(
+                    text=cleaned,
+                    source="ollama",
+                    model=self.config.model,
+                    latency_ms=latency,
+                    commentary=cleaned,
+                    explanation="Ghost Conversation",
+                    risk_warning="None",
+                )
+
+            # Fallback if empty output
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice="Model produced empty response.",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+
+        except OllamaModelNotFoundError:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice=f"Model '{self.config.model}' missing from Ollama. Run: ollama pull {self.config.model}",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+        except OllamaTimeoutError:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice=f"Ollama inference timed out after {self.config.timeout_seconds}s.",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+        except OllamaConnectionError:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice="Ollama daemon unreachable at localhost:11434.",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+        except OllamaResponseError as err:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice=f"Ollama response error: {err}",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+        except Exception as err:
+            latency = (time.perf_counter() - start_time) * 1000.0
+            reply = self._conversational_fallback(user_message)
+            return GhostWhisper(
+                text=reply,
+                source="spectral_echo",
+                model=self.config.model,
+                latency_ms=latency,
+                error_notice=f"Inference error: {err}",
+                commentary=reply,
+                explanation="Ghost Conversation",
+                risk_warning="None",
+            )
+
+    def _build_conversational_prompt(self, user_message: str) -> str:
+        """Construct conversational prompt treating user input as untrusted."""
+        safe_msg = user_message.replace("\n", " ").replace('"', "'")[:200]
+        return (
+            f"User input: \"{safe_msg}\"\n\n"
+            "Instructions:\n"
+            "- If the user says hello or greets you (e.g., 'hi', 'hello', 'hey'), reply with a short, eerie greeting (1-2 sentences).\n"
+            "- If the user asks who you are (e.g., 'who are you?'), explain your fictional identity as GhostTrace, the spirit living in the terminal.\n"
+            "- If the user asks for a ghost story (e.g., 'tell me a ghost story'), share a short chilling fictional tale (3-5 sentences) of haunted code or computers.\n"
+            "- Maintain an eerie, poetic, restrained ghost persona.\n"
+            "- Never pretend to be ChatGPT, Google Gemini, or an AI assistant.\n"
+            "- Never execute or recommend dangerous system commands.\n"
+            "- Output only your spoken response."
+        )
+
+    def _conversational_fallback(self, user_message: str) -> str:
+        """Deterministically select a curated ghost reply when LLM is offline or fails."""
+        lowered = user_message.strip().lower()
+        stripped_punc = re.sub(r"[!?,.]+$", "", lowered).strip()
+
+        # Story requests
+        if any(kw in lowered for kw in ["story", "scary", "horror", "tale"]):
+            return random.choice(CONVERSATIONAL_ECHOES["stories"])
+
+        # Identity questions
+        if any(phrase in stripped_punc for phrase in [
+            "who are you",
+            "what are you",
+            "what is your name",
+            "what's your name",
+            "who made you",
+            "are you real",
+            "are you a ghost",
+            "why are you here",
+            "how are you",
+            "what do you do",
+        ]):
+            return random.choice(CONVERSATIONAL_ECHOES["identity"])
+
+        # Greetings
+        greeting_tokens = {
+            "hi",
+            "hello",
+            "hey",
+            "howdy",
+            "greetings",
+            "hola",
+            "yo",
+            "sup",
+            "good morning",
+            "good evening",
+            "good afternoon",
+            "salutations",
+        }
+        if stripped_punc in greeting_tokens or any(stripped_punc.startswith(f"{g} ") for g in greeting_tokens):
+            return random.choice(CONVERSATIONAL_ECHOES["greetings"])
+
+        return random.choice(CONVERSATIONAL_ECHOES["general"])
+
 
