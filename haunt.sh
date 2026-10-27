@@ -285,9 +285,10 @@ __haunt_dispatch_hook() {
         return 0
     fi
 
-    # Display pending whisper from previous command if available
+    # Display pending whisper from previous command if available, then clean up
     if [ -n "$__HAUNT_PENDING_REQ" ]; then
         __haunt_check_and_display_result "$__HAUNT_PENDING_REQ" || true
+        rm -f "${__HAUNT_RUN_DIR}/${__HAUNT_PENDING_REQ}.res" "${__HAUNT_RUN_DIR}/${__HAUNT_PENDING_REQ}.res.tmp" 2>/dev/null || true
         __HAUNT_PENDING_REQ=""
     fi
 
@@ -313,20 +314,14 @@ __haunt_dispatch_hook() {
             --status "$exit_status" \
             --cwd "$cwd_base" \
             --req-id "$req_id" \
-            >/dev/null 2>&1
+            </dev/null >/dev/null 2>&1
     ) & disown 2>/dev/null || true
 
-    # Brief bounded check (up to 30ms) for instant/deterministic whispers so they appear before prompt
-    local waits=0
-    while [ $waits -lt 3 ]; do
-        if [ -f "${__HAUNT_RUN_DIR}/${req_id}.res" ]; then
-            __haunt_check_and_display_result "$req_id"
-            __HAUNT_PENDING_REQ=""
-            break
-        fi
-        sleep 0.01 2>/dev/null || true
-        waits=$((waits + 1))
-    done
+    # If the worker finished immediately (e.g. deterministic echo), display immediately
+    if [ -f "${__HAUNT_RUN_DIR}/${req_id}.res" ]; then
+        __haunt_check_and_display_result "$req_id"
+        __HAUNT_PENDING_REQ=""
+    fi
 }
 
 # ==============================================================================
@@ -364,23 +359,28 @@ if [ -n "${BASH_VERSION:-}" ]; then
     }
 
     # Install into PROMPT_COMMAND supporting both array (Bash 5.1+) and string formats
-    if [ "${BASH_VERSINFO[0]:-0}" -ge 5 ] && [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-        local found=0
-        for cmd in "${PROMPT_COMMAND[@]}"; do
-            if [ "$cmd" = "__haunt_bash_prompt" ]; then
-                found=1
-                break
+    __haunt_setup_bash_prompt_command() {
+        if [ "${BASH_VERSINFO[0]:-0}" -ge 5 ] && [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+            local found=0
+            local cmd
+            for cmd in "${PROMPT_COMMAND[@]}"; do
+                if [ "$cmd" = "__haunt_bash_prompt" ]; then
+                    found=1
+                    break
+                fi
+            done
+            if [ "$found" -eq 0 ]; then
+                PROMPT_COMMAND=(__haunt_bash_prompt "${PROMPT_COMMAND[@]}")
             fi
-        done
-        if [ $found -eq 0 ]; then
-            PROMPT_COMMAND=(__haunt_bash_prompt "${PROMPT_COMMAND[@]}")
+        else
+            case ";${PROMPT_COMMAND:-};" in
+                *";__haunt_bash_prompt;"*) ;;
+                *) PROMPT_COMMAND="__haunt_bash_prompt${PROMPT_COMMAND:+; $PROMPT_COMMAND}" ;;
+            esac
         fi
-    else
-        case ";${PROMPT_COMMAND:-};" in
-            *";__haunt_bash_prompt;"*) ;;
-            *) PROMPT_COMMAND="__haunt_bash_prompt${PROMPT_COMMAND:+; $PROMPT_COMMAND}" ;;
-        esac
-    fi
+    }
+    __haunt_setup_bash_prompt_command
+    unset -f __haunt_setup_bash_prompt_command
 
     # Clean exit farewell without clobbering existing EXIT trap
     __haunt_bash_exit() {

@@ -14,7 +14,26 @@ class TestHauntShellIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.bash_path = shutil.which("bash")
+        candidates = [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            shutil.which("bash"),
+        ]
+        cls.bash_path = None
+        for cand in candidates:
+            if cand and os.path.exists(cand):
+                try:
+                    res = subprocess.run(
+                        [cand, "-c", "echo ok"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    if res.returncode == 0 and "ok" in res.stdout:
+                        cls.bash_path = cand
+                        break
+                except Exception:
+                    continue
 
     def setUp(self):
         if not self.bash_path:
@@ -171,6 +190,90 @@ class TestHauntShellIntegration(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertNotIn("PWNED_EXECUTION", res.stdout)
         self.assertIn("DONE", res.stdout)
+
+    def test_prompt_command_array_preservation(self):
+        """Pre-existing PROMPT_COMMAND array elements must be preserved without error."""
+        script = """
+        declare -a PROMPT_COMMAND
+        PROMPT_COMMAND=("echo EXISTING_ARRAY_HOOK")
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        echo "COUNT=${#PROMPT_COMMAND[@]}"
+        echo "ELEMS=${PROMPT_COMMAND[*]}"
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("COUNT=2", res.stdout)
+        self.assertIn("EXISTING_ARRAY_HOOK", res.stdout)
+        self.assertIn("__haunt_bash_prompt", res.stdout)
+
+    def test_prompt_command_string_preservation(self):
+        """Pre-existing PROMPT_COMMAND string must be preserved without error."""
+        script = """
+        PROMPT_COMMAND="echo EXISTING_STRING_HOOK"
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        echo "PC=$PROMPT_COMMAND"
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("EXISTING_STRING_HOOK", res.stdout)
+        self.assertIn("__haunt_bash_prompt", res.stdout)
+
+    def test_existing_exit_trap_preserved(self):
+        """Pre-existing EXIT traps must be executed upon shell termination."""
+        script = """
+        trap 'echo TRAP_CALLED_ON_EXIT' EXIT
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        exit 0
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("TRAP_CALLED_ON_EXIT", res.stdout)
+
+    def test_empty_enter_does_not_trigger_new_whisper(self):
+        """Consecutive prompt commands with unchanged HISTCMD must not dispatch whispers."""
+        script = """
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        # Initial prompt command primed
+        __haunt_bash_prompt
+        # Empty enter with same HISTCMD
+        __haunt_bash_prompt
+        # Pending request should be empty
+        echo "PENDING=$__HAUNT_PENDING_REQ"
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("PENDING=", res.stdout)
+
+    def test_prompt_theme_preservation(self):
+        """User's PS1 prompt theme is never overwritten or altered by haunt.sh."""
+        script = """
+        export PS1="my_custom_starship_prompt > "
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        echo "AFTER_PS1=$PS1"
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("AFTER_PS1=my_custom_starship_prompt > ", res.stdout)
+
+    def test_haunt_status_tale_forget_commands(self):
+        """Verify haunt status, haunt tale, and haunt forget command execution."""
+        script = """
+        export HAUNT_FORCE=1
+        source ./haunt.sh
+        haunt status
+        haunt tale
+        haunt forget
+        """
+        res = self.run_bash(script)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("--- GhostTrace Status ---", res.stdout)
+        self.assertIn("You began your journey typing commands", res.stdout)
+        self.assertIn("forgotten all session footprints", res.stdout)
 
 
 if __name__ == "__main__":

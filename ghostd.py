@@ -99,6 +99,10 @@ class SecretRedactor:
         (r"(?i)\b(export\s+)?([A-Za-z_0-9]*(?:KEY|TOKEN|SECRET|PASS(?:WORD)?|AUTH|CREDENTIAL)[A-Za-z_0-9]*)\s*=\s*['\"]?([^'\"\s&;]+)['\"]?", r"\1\2=[REDACTED]"),
         # CLI flags like --password secret, --token=secret, -p secret
         (r"(?i)(--(?:password|token|secret|api-key|auth-token|access-token)(?:=|\s+))['\"]?([^'\"\s&;]+)['\"]?", r"\1[REDACTED]"),
+        # Basic auth CLI flags: -u user:pass or --user user:pass
+        (r"(?i)(-(?:-user|u)\s+[^:\s]+:)[^'\"\s&;]+", r"\1[REDACTED_PW]"),
+        # Token flags: --with-token <token>
+        (r"(?i)(--with-token(?:\s+|=))['\"]?([^'\"\s&;]+)['\"]?", r"\1[REDACTED_TOKEN]"),
         # Sensitive files and SSH keys
         (r"(?i)(?:~?/?(?:[a-zA-Z0-9_.-]+/)*)?(?:(?:\.ssh/|\.aws/)?(?:id_rsa|id_ed25519|id_ecdsa|known_hosts|credentials)|(?:\.env|\.netrc)(?:\.[a-zA-Z0-9_.-]+)?)\b", "[REDACTED_FILE_PATH]"),
     ]
@@ -842,6 +846,15 @@ def cmd_whisper(args: argparse.Namespace) -> int:
     # If req_id was supplied, write result file atomically for shell precmd retrieval
     if args.req_id:
         run_dir = get_run_dir()
+        # Clean up stale temporary files older than 30s
+        try:
+            now = time.time()
+            for f in run_dir.glob("req_*.res*"):
+                if f.is_file() and (now - f.stat().st_mtime) > 30.0:
+                    f.unlink()
+        except Exception:
+            pass
+
         res_tmp = run_dir / f"{args.req_id}.res.tmp"
         res_file = run_dir / f"{args.req_id}.res"
         try:

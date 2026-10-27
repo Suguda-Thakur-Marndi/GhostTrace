@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from ghostd import (
     LocalLoopbackClient,
+    LocalhostNoRedirectHandler,
     NetworkSecurityError,
     OutputSanitizer,
     SecretRedactor,
@@ -71,6 +72,18 @@ class TestSecretRedactor(unittest.TestCase):
         redacted = SecretRedactor.redact(text)
         self.assertNotIn("id_rsa", redacted)
         self.assertIn("[REDACTED_FILE_PATH]", redacted)
+
+    def test_redact_basic_auth_flag(self):
+        text = "curl -u admin:SecretPassword123 https://api.local/data"
+        redacted = SecretRedactor.redact(text)
+        self.assertNotIn("SecretPassword123", redacted)
+        self.assertIn("[REDACTED_PW]", redacted)
+
+    def test_redact_with_token_flag(self):
+        text = "gh auth login --with-token ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+        redacted = SecretRedactor.redact(text)
+        self.assertNotIn("ghp_1234567890abcdefghijklmnopqrstuvwxyz", redacted)
+        self.assertIn("[REDACTED_TOKEN]", redacted)
 
     def test_sanitize_command_for_prompt_no_args_by_default(self):
         cmd, args = SecretRedactor.sanitize_command_for_prompt("git status", "status -s", allow_args=False)
@@ -165,6 +178,11 @@ class TestLocalLoopbackClient(unittest.TestCase):
     def test_reject_invalid_scheme(self):
         with self.assertRaises(NetworkSecurityError):
             LocalLoopbackClient(endpoint="ftp://localhost:21")
+
+    def test_redirect_handler_refuses_redirects(self):
+        handler = LocalhostNoRedirectHandler()
+        with self.assertRaises(NetworkSecurityError):
+            handler.redirect_request(req=None, fp=None, code=302, msg="Found", headers={}, newurl="http://evil.com")
 
     @patch("urllib.request.OpenerDirector.open")
     def test_offline_mode_creates_zero_http_requests(self, mock_open):
