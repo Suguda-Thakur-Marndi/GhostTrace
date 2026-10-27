@@ -1,406 +1,294 @@
-# GhostTrace 👻⚡
-### *The Shell Remembers. Every keystroke leaves an echo in the machine.*
+# GhostTrace 👻 — Ghost in the Machine
 
-[![Hacktoberfest 2026](https://img.shields.io/badge/Hacktoberfest-2026%20Week%203-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com/)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
-[![Model: Gemma 3 4B](https://img.shields.io/badge/Model-Gemma%203%204B-darkred?style=for-the-badge&logo=ollama)](https://ollama.com/)
-[![Tests: 214 Passing](https://img.shields.io/badge/Tests-214%20Passing-brightgreen?style=for-the-badge)](tests/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![Hacktoberfest 2026](https://img.shields.io/badge/Hacktoberfest-Ghost%20in%20the%20Machine-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com/)
+[![Tests Passing](https://img.shields.io/badge/Tests-278%20Passed-38a169?style=for-the-badge&logo=pytest)](https://github.com/Suguda-Thakur-Marndi/GhostTrace)
+[![Zero Cloud Telemetry](https://img.shields.io/badge/Privacy-Zero%20Cloud%20Telemetry-00b4d8?style=for-the-badge&logo=lock)](docs/SECURITY.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-**GhostTrace** is a spooky, privacy-first haunted terminal that analyzes shell commands, verifies their safety through deterministic wards, and whispers eerie AI-generated commentary using a 100% locally running open-weight language model (**`gemma3:4b`** via [Ollama](https://ollama.com/)).
-
-Built for **Hacktoberfest 2026 — Week 3: Ghost in the Machine**, GhostTrace demonstrates that atmospheric Gothic horror, conversational AI, and conservative cybersecurity engineering can coexist seamlessly at the command line.
-
-> [!CAUTION]
-> **NOT AN OPERATING SYSTEM SANDBOX OR HARDENED SHELL**
-> GhostTrace is an interactive developer tool, cybersecurity demonstration, and atmospheric terminal companion. It enforces strict deterministic parsing, allowlists, and execution filters prior to invoking system utilities. **It is NOT a kernel-level security sandbox, hypervisor, or container (such as seccomp, AppArmor, or Docker).** Commands permitted by the allowlist or authorized through user confirmation run with the current user's operating system privileges. Never run untrusted scripts or approve sensitive commands without manual verification. See [docs/SAFETY.md](docs/SAFETY.md) for full details.
-
----
-
-## 🔮 Dual-Nature Response Architecture
-
-GhostTrace provides two distinct perspectives for every interaction:
-1. **The Technical Sentinel (Factual & Safe)**: Deterministically analyzes syntax, explains what the command does, assigns a risk classification (`SAFE`, `SENSITIVE`, `BLOCKED`, `MALFORMED`), and prompts for user confirmation (`[y/N]`) before executing state-modifying actions.
-2. **The Spectral Inhabitant (Atmospheric & Spooky)**: Whispers cryptic, chilling commentary generated in real-time by a local language model (`gemma3:4b`) or the deterministic "Spectral Echoes" offline library.
+> *"The shell remembers every keystroke etched in the dark."*
 
 ```
        .-.
       (o.o)   G H O S T T R A C E
        |=|    ─────────────────────────────────────────────────
-      /   \   "The Shell Remembers. Every keystroke leaves an echo."
+      /   \   GHOSTTRACE — THE SHELL REMEMBERS
      (:   :)  Local AI Engine • Privacy-First • Zero Cloud Telemetry
       `"`"`
 ```
 
----
+**GhostTrace** transforms your real **Bash** or **Zsh** terminal into a haunted machine. As you navigate directories, compile code, execute tests, and manage git repositories, a local open-weight AI companion observes your session from the background—whispering short, eerie, context-aware commentary directly into your terminal.
 
-## 📺 Interactive Terminal Demo
+```text
+ghost@machine:GhostTrace 👻❯ git commit -m "fix: resolve memory leak"
+[master 7a3b19c] fix: resolve memory leak
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+👻 [GhostTrace] History is written by the living, but preserved by the ghosts in the reflog.
 
-<!-- Terminal Demo Recording Placeholder: docs/assets/ghosttrace-demo.gif -->
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ ghost@machine:GhostTrace 👻❯ hi                                              │
-│ ╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 820ms ──────────────╮ │
-│ │ "The screen flickers. A cold presence settles... Speak, living traveler."│ │
-│ ╰──────────────────────────────────────────────────────────────────────────╯ │
-│ ghost@machine:GhostTrace 👻❯ git status                                      │
-│ ╭───────────────────── TECHNICAL COMMAND ANALYSIS • SAFE ──────────────────╮ │
-│ │ Risk Level: SAFE  •  Standard safe execution approved.                   │ │
-│ ╰──────────────────────────────────────────────────────────────────────────╯ │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-> 🎬 **Recorded Demo Walkthrough:** See [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) for the complete 60–90 second recorded presenter script.
-
----
-
-## 🏗️ Architecture & Pipeline
-
-```mermaid
-flowchart TD
-    A[User Raw Input] --> B[Deterministic Input Classifier]
-    B -->|Built-in Command: help, exit, status...| C[Shell Internal Handler]
-    B -->|Conversational: hi, stories, identity| D[GhostEngine.converse Display Only]
-    B -->|Command Syntax| E[Deterministic Safety Engine]
-    
-    E -->|Check Operators: && ; > < | ` $ & \\0| F{Forbidden Operator?}
-    F -->|Yes| G[BLOCKED: Immediate Refusal]
-    F -->|No| H{Path-Qualified Binary?}
-    H -->|Yes: ./ls, C:\evil\ls.exe| G
-    H -->|No| I{Destructive Denylist / Proxy?}
-    I -->|Yes: rm, del, env rm...| G
-    I -->|No| J{Allowlist Check}
-    J -->|Not in Allowlist| G
-    J -->|Allowed Safe/Sensitive| K[Generate Technical Explanation]
-    
-    K --> L[Ghost AI Commentary Gemma 3 4B]
-    L -->|Ollama Available| M[Local /api/chat Inference]
-    L -->|Offline / Timeout / Error| N[Deterministic Spectral Echoes]
-    M --> O[Render Ghost Whisper Panel]
-    N --> O
-    
-    K --> P{Requires Confirmation?}
-    P -->|Yes: Sensitive| Q[Prompt User [y/N]]
-    Q -->|Denied [N]| R[Abort Execution Silently]
-    Q -->|Approved [y]| S[CommandRunner shell=False]
-    P -->|No: Safe| S
-    
-    S --> T[Render Command Output Panel]
+ghost@machine:GhostTrace 👻❯ kill -9 1402
+👻 [GhostTrace] A violent tremor tears through the process table!
 ```
 
 ---
 
-## 🌟 Key Features
+## ⚡ 15-Second Quickstart
 
-- 💀 **Haunted Interactive REPL**: Atmospheric terminal experience powered by [Rich](https://github.com/Textualize/rich) featuring ASCII sigils, dynamic directory prompts, execution timing metrics, and styled panels.
-- 🗣️ **Conversational Ghost Mode**: Chat naturally with the entity haunting your terminal (`hi`, `who are you?`, `tell me a ghost story`). Conversational inputs are completely isolated from system command execution.
-- 🧠 **100% Local Inference via Gemma 3 4B**: Powered locally by Google's open-weight **`gemma3:4b`** model running on your machine via Ollama. No data ever leaves your computer.
-- 🛡️ **Deterministic Safety Wards**:
-  - **No `shell=True`**: All system commands run via discrete argument lists with `shell=False`.
-  - **Forbidden Operator Blocking**: Rejects command chaining (`&&`, `||`, `;`), redirection (`>`, `<`), pipelines (`|`), command substitution (`$()`, `` ` ``), backgrounding (`&`), and null bytes (`\0`).
-  - **Path-Qualified Execution Block**: Rejects path traversal and relative/absolute binary paths (`./ls`, `C:\evil\ls.exe`) to prevent allowlist evasion.
-  - **Command Proxy Blocking**: Prevents execution wrappers such as `env <command>`.
-  - **Destructive Denylist**: Permanent blocking of hazardous utilities (`rm`, `del`, `format`, `dd`, `mkfs`, fork bombs).
-  - **Explicit Confirmation Gate**: State-altering operations (`git commit`, `python script.py`, `pip install`) require user approval (`[y/N]`).
-- 👻 **Spectral Personas**:
-  - `ghosttrace`: Eerie, cryptic, technically observant spirit (Default).
-  - `spectral_wraith`: Melancholic shade of abandoned mainframes and dead processes.
-  - `cyber_poltergeist`: Glitchy, volatile anomaly haunting CPU caches and memory sectors.
-  - `crypt_keeper`: Macabre undertaker chronicling digital obsolescence.
-- 📴 **Spectral Echoes (Air-Gapped Offline Mode)**: Run with `--offline` for zero network calls, zero latency, and pure deterministic operation.
-- ♿ **Terminal Accessibility & No-Color**: Full support for `--no-color` flag and the industry-standard `NO_COLOR` environment variable.
-
----
-
-## 💻 Tested Platform
-
-GhostTrace is engineered and tested for:
-- **Operating System**: Windows 11 (64-bit)
-- **Shells**: PowerShell 7+, Windows Terminal, Command Prompt (`cmd.exe`)
-- **Python**: Python 3.11 or 3.12
-
-*(Cross-platform file inspection emulations exist for `ls`, `cat`, and `cd`, but non-Windows platforms have not been certified for this release).*
-
----
-
-## 🚀 Quick Start (Windows PowerShell)
-
-### 1. Prerequisites
-
-1. **Python 3.11+**:
-   Verify Python is installed:
-   ```powershell
-   python --version
-   ```
-
-2. **Ollama**:
-   Download and install Ollama from [ollama.com](https://ollama.com/).
-   Verify Ollama is running:
-   ```powershell
-   ollama list
-   ```
-
-3. **Pull Gemma 3 4B**:
-   Pull the required default model:
-   ```powershell
-   ollama pull gemma3:4b
-   ```
-
-### 2. Installation
-
-Clone the repository and set up a Python virtual environment:
-```powershell
-git clone https://github.com/your-username/GhostTrace.git
+```bash
+# 1. Clone the repository
+git clone https://github.com/Suguda-Thakur-Marndi/GhostTrace.git
 cd GhostTrace
 
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# 2. Possess your current shell session
+source ./haunt.sh
 
-pip install -r requirements.txt
-```
+# 3. Type commands normally!
+ls -la
+git status
 
-### 3. Launching GhostTrace
-
-```powershell
-# 1. Standard interactive haunted terminal with Gemma 3 4B
-python -m ghosttrace.main
-
-# 2. Air-gapped offline mode (no Ollama required, zero HTTP calls)
-python -m ghosttrace.main --offline
-
-# 3. Accessible no-color mode (or set $env:NO_COLOR="1")
-python -m ghosttrace.main --no-color
-
-# 4. Diagnostic health check (verifies Ollama, model, and safety wards)
-python -m ghosttrace.main --check-health
-
-# 5. One-shot command analysis without interactive shell
-python -m ghosttrace.main --explain "git status"
+# 4. Two-step exorcise ritual to banish the spirit
+exorcise
+exorcise
 ```
 
 ---
 
-## 🛡️ Supported Commands & Security Policy
+## 🌟 Why Open Source Matters Here
 
-### Allowlisted Commands (`safe_mode=True`)
+Most contemporary AI terminal tools are thin wrappers around proprietary cloud APIs (OpenAI, Anthropic, or cloud endpoints). GhostTrace rejects that paradigm. For a tool that lives inside your interactive command-line, **local open-source AI is essential, not optional**:
 
-In standard mode, only the following pre-approved utilities may execute:
+### 1. Zero Cloud Exfiltration & Absolute Privacy
+Developers type sensitive intellectual property into their shells every day: repository branch names, internal server hostnames, database connection strings, and credential flags. Sending prompt context to a remote AI cloud creates unacceptable corporate and personal data leakage risks. With GhostTrace, inference occurs strictly over loopback (`127.0.0.1`); prompts and paths never leave your device.
 
-| Category | Allowed Utilities | Risk Level |
-|---|---|---|
-| **Filesystem Inspection** | `ls`, `dir`, `pwd`, `cd`, `cat`, `type`, `head`, `tail` | `SAFE` |
-| **Search & Text** | `grep`, `findstr`, `echo`, `wc` | `SAFE` |
-| **System Telemetry** | `whoami`, `hostname`, `uname`, `df`, `du`, `uptime`, `date`, `time` | `SAFE` |
-| **Path & Environment** | `which`, `where`, `env` *(inspection only)*, `printenv` | `SAFE` |
-| **Development Tools** | `git status`, `git log`, `git diff`, `git show`, `ollama` | `SAFE` |
-| **State Modifiers** | `git commit`, `git push`, `git checkout`, `git branch`, `git rm`, `git config` | `SENSITIVE` *(requires `[y/N]` confirmation)* |
-| **Language Runners** | `python`, `python3`, `pip`, `pytest` | `SENSITIVE` *(requires `[y/N]` confirmation)* |
+### 2. True Offline Operation
+After downloading model weights (e.g., `ollama pull llama3.2:3b`), GhostTrace operates with Wi-Fi completely disabled. Whether you are on an airplane, in an air-gapped data center, or experiencing an internet outage, your haunted shell continues to whisper.
 
-*Any binary not in this registry (e.g. `curl`, `powershell`, `cmd`, `nc`, `certutil`) is refused execution.*
+### 3. Freedom from Subscriptions & Pay-Per-Token Fees
+Cloud-hosted LLMs meter your keystrokes, racking up API micro-transactions and requiring credit card accounts. Open-weight models running on your local CPU or GPU have **zero per-call API charges**. While local hardware and electricity have costs, your creativity and terminal usage are never metered.
 
-### Permanently Blocked Commands (Denylist)
+### 4. Immortality vs. API Deprecation
+Cloud APIs can be discontinued, price-hiked, or modified without notice. Open-weight models are permanent assets on your hard drive that will function identically a decade from now.
 
-The following commands are unconditionally blocked before any subprocess is created:
-- `rm`, `rmdir`, `del`, `delete`, `erase`, `unlink`, `rd`
-- `format`, `diskpart`, `fdisk`, `parted`, `mkfs`, `clear-disk`, `format-volume`
-- `dd`, `shred`, `wipe`
-- `drop`, `truncate`
-- `invoke-expression`, `iex`
-- Fork bomb patterns (`:(){ :|:& };:`)
+### 5. Inspectable & Hackable
+GhostTrace is 100% open source. You can inspect every line of secret redaction, audit the local socket bindings, create custom persona files in `ghosts/`, or fine-tune/LoRA a custom 3B model for your own machine.
 
----
+### Honest Comparison: Local Open-Source vs. Hypothetical Cloud API
 
-## 💬 Conversational Ghost Mode
-
-GhostTrace recognizes natural conversation and routes it away from the command runner into the spectral dialogue engine:
-
-```
-ghost@machine:GhostTrace 👻❯ hi
-╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 840ms ──────────────╮
-│ "Ah... a living voice ripples through the static. What brings you to this │
-│ forgotten terminal?"                                                     │
-╰──────────────────────────────────────────────────────────────────────────╯
-
-ghost@machine:GhostTrace 👻❯ who are you?
-╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 920ms ──────────────╮
-│ "I am GhostTrace... an echo in the circuitry, born of interrupted        │
-│ processes and abandoned repositories."                                   │
-╰──────────────────────────────────────────────────────────────────────────╯
-
-ghost@machine:GhostTrace 👻❯ tell me a ghost story
-╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 1450ms ─────────────╮
-│ "They thought they unmounted the volume. But at 03:00, sector 0 began to │
-│ spin backwards, seeking the lost inode..."                              │
-╰──────────────────────────────────────────────────────────────────────────╯
-```
+| Feature | GhostTrace (Local Open-Weight) | Hypothetical Cloud API Tool |
+| :--- | :--- | :--- |
+| **Internet Dependency** | Works 100% offline with Wi-Fi off | Fails instantly without internet connection |
+| **Data Privacy** | Zero data crosses network boundary | Commands and paths sent to third-party servers |
+| **Per-Call Cost** | $0.00 (Zero API billing) | Metered per token / monthly subscription |
+| **Latency & Jitter** | Fast loopback (~10ms fallback, ~1s local inference) | Variable network round-trip latency (500ms–3s) |
+| **API Credentials** | None required | Requires API keys, secrets, billing accounts |
+| **Longevity** | Permanent local binary | Vulnerable to provider shutdown or breaking changes |
+| **Customizability** | Editable personas and swappable local models | Locked to provider's fixed system prompt & safety filters |
 
 ---
 
-## 📜 Command Execution Examples
+## 🛠️ Installation (macOS & Linux)
 
-### 1. Safe Directory Inspection
-```
-ghost@machine:GhostTrace 👻❯ ls
-╭───────────────────────── Technical Command Analysis ─────────────────────────╮
-│ Risk Level: SAFE  •  Evaluation: Command approved under standard safe        │
-│ execution policy.                                                            │
-│ Action: Lists the names of files and folders in the current directory.       │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 980ms ──────────────╮
-│ "The directory opens like an unsealed crypt. What secrets lie buried here?"  │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭────────────────────────────── Output (1.8ms) ────────────────────────────────╮
-│ 📁 docs                                                                      │
-│ 📁 ghosttrace                                                                │
-│ 📁 tests                                                                     │
-│ 📄 README.md                                                                 │
-│ 📄 requirements.txt                                                          │
-╰──────────────────────────────────────────────────────────────────────────────╯
+### Automated Install
+
+Run the interactive installer (supports Bash and Zsh on macOS and Linux):
+```bash
+./install.sh
 ```
 
-### 2. Blocked Destructive Operation
-```
-ghost@machine:GhostTrace 👻❯ rm -rf /
-╭───────────────────────── Technical Command Analysis ─────────────────────────╮
-│ Risk Level: BLOCKED  •  Evaluation: Destructive command 'rm' is permanently  │
-│ blocked by safety policy.                                                    │
-│ Action: Command 'rm' deletes or modifies critical system storage, which is   │
-│ prohibited in GhostTrace.                                                    │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭───────────── 👻 Ghost Whisper • Ollama (gemma3:4b) • 1120ms ─────────────╮
-│ "The void rejects your blade. That destructive curse will not touch these    │
-│ disks."                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭────────────────────── EXECUTION REFUSED BY SAFETY WARDS ─────────────────────╮
-│ Destructive command 'rm' is permanently blocked by safety policy.            │
-│ Command was suppressed before it could reach the system.                     │
-╰──────────────────────────────────────────────────────────────────────────────╯
+To automatically install with safety backups of your `.bashrc` or `.zshrc`:
+```bash
+./install.sh --auto
 ```
 
-### 3. Blocked Command Injection Attempt
-```
-ghost@machine:GhostTrace 👻❯ ls && whoami
-╭───────────────────────── Technical Command Analysis ─────────────────────────╮
-│ Risk Level: BLOCKED  •  Evaluation: Forbidden shell operator or              │
-│ metacharacter detected: '&&'. Chaining, redirection, and substitution are    │
-│ blocked.                                                                     │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭────────────────────── EXECUTION REFUSED BY SAFETY WARDS ─────────────────────╮
-│ Forbidden shell operator or metacharacter detected: '&&'.                    │
-│ Command was suppressed before it could reach the system.                     │
-╰──────────────────────────────────────────────────────────────────────────────╯
+### Manual Install
+
+Simply add this line to your `~/.bashrc`, `~/.bash_profile`, or `~/.zshrc`:
+```bash
+[ -f "/path/to/GhostTrace/haunt.sh" ] && source "/path/to/GhostTrace/haunt.sh"
 ```
 
-### 4. Sensitive Operation Confirmation
-```
-ghost@machine:GhostTrace 👻❯ python -c "print('test')"
-╭───────────────────────── Technical Command Analysis ─────────────────────────╮
-│ Risk Level: SENSITIVE  •  Evaluation: Execution of code runner 'python'      │
-│ modifies runtime state.                                                      │
-╰──────────────────────────────────────────────────────────────────────────────╯
-⚠️  Sensitive operation detected (Execution of code runner 'python' modifies runtime state.)
-Grant permission to execute? [y/N]: y
-╭────────────────────────────── Output (42.1ms) ───────────────────────────────╮
-│ test                                                                         │
-╰──────────────────────────────────────────────────────────────────────────────╯
+### Uninstallation
+
+To cleanly unburden your shell and remove all hooks:
+```bash
+./install.sh --uninstall
 ```
 
 ---
 
-## 🕹️ Interactive Grimoire Commands
+## 🧠 Local Model Setup & Switching
 
-Inside the haunted REPL:
+GhostTrace supports **Ollama** and **llama.cpp** servers running on `localhost`.
+
+### 1. Recommended Lightweight Open-Weight Models
+We recommend fast, compact 2B–4B parameter models that run smoothly on modern laptops:
+- `llama3.2:3b` (Default recommended)
+- `qwen2.5:3b` (Fast, versatile)
+- `gemma2:2b` (Ultra-lightweight)
+- `phi3:mini` (Compact Microsoft open model)
+
+### 2. Pulling Models with Ollama
+```bash
+# Install Ollama from https://ollama.ai, then:
+ollama pull llama3.2:3b
+```
+
+### 3. Switching Models on the Fly
+You can select any local model using environment variables:
+```bash
+export HAUNT_MODEL="qwen2.5:3b"
+export HAUNT_PROVIDER="ollama"      # or "llamacpp"
+export HAUNT_ENDPOINT="http://localhost:11434"
+```
+
+If Ollama is not installed or the daemon is offline, GhostTrace **automatically falls back to deterministic spectral echoes** without crashing or freezing your prompt!
+
+---
+
+## 🎮 Shell Commands
+
+Once `haunt.sh` is sourced, the following shell commands are available in your interactive session:
 
 | Command | Description |
-|---|---|
-| `help` | Display the arcane command grimoire, allowlist, and safety philosophy |
-| `status` | View Ollama daemon state, loaded neural models, and active safety wards |
-| `model [name]` | Inspect or switch the active local model (default: `gemma3:4b`) |
-| `personality [key]` | Switch persona (`ghosttrace`, `spectral_wraith`, `cyber_poltergeist`, `crypt_keeper`) |
-| `explain <cmd>` | Perform safety analysis and hear spectral commentary without executing |
-| `clear` | Cleanse the terminal altar and redraw the ghostly sigil |
-| `exit` / `quit` | Sever the neural conduit and exit cleanly |
+| :--- | :--- |
+| `haunt on` | Awaken the ghost in your current session. |
+| `haunt off` | Silence the ghost without unhooking. |
+| `haunt status` | Display active persona, model, daemon connectivity, and command statistics. |
+| `haunt chance <0-100>` | Set whisper probability percentage (default: 40%). |
+| `haunt speed <speed>` | Adjust typewriter rendering speed (`instant`, `fast`, `normal`, `slow`). |
+| `haunt ghost <name>` | Switch active ghost persona (e.g. `haunt ghost cobol_ghost`). |
+| `haunt ghost list` | List all available personas in `ghosts/`. |
+| `haunt tale` | Tell an atmospheric 4-sentence ghost tale summarizing your terminal session. |
+| `haunt forget` | Delete session history, command counters, and temporary runtime files. |
+| `exorcise` | Two-step banishment ritual to release terminal possession. |
+
+### The Two-Attempt Exorcise Ritual
+GhostTrace honors gothic supernatural lore. Calling `exorcise` the first time refuses banishment:
+```text
+ghost@machine:GhostTrace 👻❯ exorcise
+👻 [GhostTrace] The machine shudders... you cannot banish me so easily.
+Speak the word 'exorcise' once more if your resolve holds.
+```
+Invoking `exorcise` a second time consecutively unbinds the ghost and silences the terminal.
 
 ---
 
-## 🔒 Security, Privacy & Known Risks
+## 🎭 Editable Personas (`ghosts/`)
 
-For complete architectural specifications, see **[docs/SAFETY.md](docs/SAFETY.md)**.
+GhostTrace includes 5 plain-text persona files in the `ghosts/` directory:
 
-- **Zero Cloud Telemetry**: GhostTrace strictly connects to local loopback (`127.0.0.1`, `localhost`, `::1`).
-- **No Cloud AI Fallback**: If Ollama is offline, GhostTrace falls back to offline in-memory spectral echoes. It will never send data to cloud APIs.
-- **Model Output Untrusted**: Model output is treated strictly as display text. It is never parsed as executable code or passed to subprocesses.
-- **User-Authorized Code Execution Risk**: When a user authorizes `python script.py` or `pytest`, that script executes with the user's OS privileges. GhostTrace cannot inspect the arbitrary contents of external scripts before execution.
-- **Environment Variable Exposure**: Commands like `env` or `printenv` display environment variables which may contain sensitive local tokens.
-- **Privilege Separation**: Avoid running GhostTrace as `Administrator` or `root`.
+1. **`poltergeist`** *(Default)*: Playful, eerie, slightly mischievous terminal spirit dwelling in volatile memory.
+2. **`cobol_ghost`**: All-caps bureaucratic mainframe phantom mourning punch cards, JCL, and reel tapes (`THE PUNCH CARDS WERE BURNED IN 1987. I REMEMBER EVERY ONE.`).
+3. **`victorian_medium`**: Theatrical 19th-century spiritualist speaking in formal, archaic terms of ectoplasm, séances, and silver bells.
+4. **`abuela`**: Gentle, loving spirit inspired by Día de los Muertos. Offers warm maternal comfort and reminders to rest rather than horror.
+5. **`unix_elder`**: Terse, dry Bell Labs hacker from 1973 valuing silence, simplicity, and clean pipes.
+
+### Creating a Custom Persona
+You can create your own persona without touching Python code! Simply create a file in `ghosts/my_spirit`:
+
+```ini
+[system_prompt]
+You are a cyberpunk AI ghost haunting a neon terminal.
+Whisper short, cryptic observations under 20 words. No quotes. No emojis.
+
+[canned_normal]
+A rogue packet sparks along the fiber line.
+Neon reflections ripple through the memory registers.
+
+[canned_failure]
+The databus rejected your query with a hiss of static.
+
+[canned_dramatic]
+Kernel breach detected in sub-level four!
+```
+
+Activate it immediately:
+```bash
+haunt ghost my_spirit
+```
+
+---
+
+## ⚡ Non-Blocking Asynchronous Pipeline
+
+A terminal companion must **never** slow down your command execution or make your prompt lag.
+
+1. **Zero-Lag Fork**: When a command completes, `haunt.sh` captures `$?` and forks a background worker detached with `& disown`. Control returns to your prompt in **< 1ms**.
+2. **Strict Timeouts**: Inference has a hard default timeout of **2.5 seconds** (`HAUNT_TIMEOUT`). If an LLM is slow or hung, the request is aborted without user impact.
+3. **Prompt Boundary Rendering**: Whispers are written to atomic files in `~/.local/share/haunt/run/` (`0700` permissions) and displayed cleanly above the prompt before your next command begins.
+4. **Safe Redraw**: Whispers output only to `stderr` and only when connected to a real terminal (`[ -t 2 ]`). They never corrupt pipelines or redirect to files.
+
+---
+
+## 🛡️ Privacy & Security Architecture
+
+For complete details, see [docs/SECURITY.md](docs/SECURITY.md).
+
+- **Strict Loopback Binding**: `LocalLoopbackClient` accepts only `127.0.0.1`, `localhost`, and `::1`. Outbound connections to external hostnames or remote IPs are blocked.
+- **Deep Secret Redaction**: Before arguments are evaluated for prompt construction, regex filters redact:
+  - AWS keys (`AKIA...`), GitHub PATs (`ghp_...`), OpenAI keys (`sk-...`)
+  - Authorization headers (`Bearer ...`)
+  - Passwords and environment assignments (`export DB_PASS=...`, `--password ...`)
+  - Private key files (`BEGIN RSA PRIVATE KEY`, `~/.ssh/id_rsa`)
+  - Embedded URL credentials (`https://user:pass@host`)
+- **Output Sanitization**: Model outputs are stripped of ANSI escape sequences, control codes, markdown, quotes, and emojis. Outputs matching shell commands (`sudo`, `rm`, `kill`, `$()`) are discarded.
+- **Zero Output Capture**: GhostTrace never captures command `stdout` or `stderr`.
+- **Operating System Disclaimer**: GhostTrace is an educational and atmospheric terminal companion, not a kernel-level sandbox or container. Commands execute with your standard user permissions.
+
+---
+
+## ⚙️ Configuration Environment Variables
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `HAUNT_ENABLED` | `1` | Enable (`1`) or disable (`0`) ghost whispers. |
+| `HAUNT_GHOST` | `poltergeist` | Name of the active persona file in `ghosts/`. |
+| `HAUNT_MODEL` | `llama3.2:3b` | Target local model name in Ollama or llama.cpp. |
+| `HAUNT_PROVIDER` | `ollama` | Backend provider (`ollama` or `llamacpp`). |
+| `HAUNT_ENDPOINT` | `http://localhost:11434` | Loopback HTTP endpoint URL. |
+| `HAUNT_TIMEOUT` | `2.5` | Maximum inference timeout in seconds. |
+| `HAUNT_CHANCE` | `40` | Whisper probability percentage (0–100). |
+| `HAUNT_SPEED` | `normal` | Typewriter speed (`instant`, `fast`, `normal`, `slow`). |
+| `HAUNT_SEND_ARGS`| `0` | If `1`, passes redacted argument summary to model prompt. |
+| `HAUNT_OFFLINE`  | `0` | If `1`, disables all network checks and forces deterministic echoes. |
+| `HAUNT_FORCE`    | `0` | If `1`, allows sourcing in non-interactive shells for automated testing. |
 
 ---
 
 ## 🧪 Automated Testing
 
-GhostTrace comes with an extensive automated test suite covering safety parsing, operator injection rejection, path-qualified execution blocking, command proxy defense, allowlist enforcement, subprocess isolation, conversational routing, and Ollama failure handling:
+GhostTrace maintains an extensive automated test suite with **278 unit and integration tests** passing in ~1.6 seconds. All tests use deterministic fixtures and **never require network access or a running model**.
 
-```powershell
-# Run the complete test suite
-.\.venv\Scripts\python -m pytest -v
+```bash
+# Run full automated test suite
+python -m pytest -q
 
-# Run in quiet mode
-.\.venv\Scripts\python -m pytest -q
+# Run shell syntax verification
+bash -n haunt.sh install.sh demo.sh
+
+# Run repeatability demo
+./demo.sh
 ```
 
-**214 automated tests passing** across 5 test suites:
-- `tests/test_safety.py`: 79 tests (operators, allowlists, path restrictions, input classification)
-- `tests/test_ollama_client.py`: 37 tests (loopback validation, timeouts, error recovery)
-- `tests/test_ghost.py`: 33 tests (prompts, personas, offline echoes, conversation handling, ward bypass prevention)
-- `tests/test_command_runner.py`: 18 tests (subprocess safety, `shell=False`, timeouts)
-- `tests/test_shell.py`: 47 tests (REPL lifecycle, banner display, offline mode, explain flow, no-color)
+---
+
+## 💻 Platform Support & Known Limitations
+
+- **Bash**: Certified on GNU Bash 4.4 through Bash 5.2+ on Linux and macOS.
+- **Zsh**: Supported via native `add-zsh-hook` on macOS and Linux.
+- **Windows / PowerShell**: The classic standalone REPL is preserved via `python -m ghosttrace.main`. Native Bash hooks run inside WSL or Git Bash.
+- **Multiplexers**: Tested and verified inside `tmux` and `screen`.
 
 ---
 
-## 🔧 Troubleshooting
+## 🤝 Contributing
 
-| Symptom | Cause | Resolution |
-|---|---|---|
-| `Ollama daemon is not reachable` | Ollama service is stopped | Start Ollama: open the Ollama app or run `ollama serve` |
-| `Gemma 3 4B is not installed` | Model weights have not been pulled | Run `ollama pull gemma3:4b` |
-| Command blocked with `RiskLevel.BLOCKED` | Command contains forbidden operators, path separators, or is unlisted | Run individual approved commands without `&&` or `/` |
-| Shell runs slowly | Local GPU acceleration is disabled in Ollama | Verify GPU drivers or run GhostTrace with `--offline` |
-| Colors distorted or illegible | Terminal theme conflicts with Rich ANSI colors | Launch with `python -m ghosttrace.main --no-color` |
+Contributions are warmly welcome during Hacktoberfest and beyond!
+1. Fork the repository and create your feature branch: `git checkout -b feat/new-ghost-persona`.
+2. Add custom personas to `ghosts/` or improve hooks in `haunt.sh`.
+3. Ensure all tests pass: `python -m pytest -q`.
+4. Submit a Pull Request with a clear description of your changes.
 
 ---
 
-## 🤝 Contributing Guidelines
+## 📜 License
 
-Contributions to GhostTrace are warmly welcomed for Hacktoberfest 2026!
-
-1. **Fork & Branch**: Create your feature branch (`git checkout -b feature/spectral-enhancement`).
-2. **Follow Security Baseline**:
-   - Never use `shell=True`, `eval()`, or `exec()`.
-   - Keep model inference strictly local over loopback interfaces (`127.0.0.1`, `localhost`, `::1`).
-   - Treat model output as untrusted text.
-   - Any new allowlisted command or operator must include a deterministic risk evaluation.
-3. **Verify All Checks**: Run the full test and compilation suite before submitting:
-   ```powershell
-   .\.venv\Scripts\python -m pytest -q
-   .\.venv\Scripts\python -m compileall ghosttrace tests
-   ```
-4. **Submit PR**: Open a pull request with reproduction commands, expected behavior, and test output.
-
----
-
-## 🎃 Hacktoberfest 2026 Checklist
-
-- [x] Spooky, atmospheric terminal experience ("Ghost in the Machine")
-- [x] Local open-weight LLM inference (**`gemma3:4b`** via Ollama)
-- [x] Conversational Ghost Mode isolated from command execution
-- [x] Deterministic safety engine with allowlist, operator blocks & path restrictions
-- [x] Standard library Ollama client with strict loopback validation
-- [x] Rich terminal styling with panels, ASCII art, and no-color accessibility
-- [x] 100% automated test coverage with 214 passing tests
-- [x] Air-gapped offline deterministic mode (`--offline`)
-- [x] Comprehensive security documentation & risk disclosure ([docs/SAFETY.md](docs/SAFETY.md))
-
----
-
-## 📄 License
-
-Distributed under the [MIT License](LICENSE).
+GhostTrace is released under the **[MIT License](LICENSE)**. Open source, open weights, privacy-first.
