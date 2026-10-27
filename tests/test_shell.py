@@ -9,6 +9,7 @@ import pytest
 from ghosttrace.command_runner import ExecutionResult
 from ghosttrace.config import GhostConfig
 from ghosttrace.ghost import GhostWhisper
+from ghosttrace.ollama_client import OllamaClient
 from ghosttrace.safety import RiskLevel, SafetyReport
 from ghosttrace.shell import HauntedShell
 
@@ -416,6 +417,115 @@ def test_blocked_command_whisper_renders_security_notice_and_red_border(shell: H
         assert panel.border_style == "red"
         assert "Passive Text Explanation" in panel.title
         assert "⚠️  Security Notice:" in panel.renderable
+
+
+def test_full_command_lifecycle_safe_command_order(shell: HauntedShell):
+    """Verify complete end-to-end command lifecycle:
+    1. Validation
+    2. Execution
+    3. Output displayed
+    4. Post-command AI commentary generated & displayed
+    """
+    mock_res = ExecutionResult(
+        stdout="archive1.log\narchive2.log",
+        stderr="",
+        returncode=0,
+        duration_ms=10.0,
+        executed=True,
+    )
+
+    with patch.object(shell.runner, "execute", return_value=mock_res) as mock_exec, patch.object(
+        shell.console, "print"
+    ) as mock_print:
+        shell.handle_input("ls")
+
+        # 1. Execution must be invoked
+        mock_exec.assert_called_once()
+
+        # Extract printed panels in chronological order
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+
+        # Verify panels generated: Technical Analysis, Output, GhostTrace Commentary
+        assert any("TECHNICAL COMMAND ANALYSIS" in t for t in titles)
+        assert any("Output" in t for t in titles)
+        assert any("GhostTrace" in t for t in titles)
+
+        # Verify ordering: Output must be rendered BEFORE the post-command GhostTrace commentary
+        output_idx = next(i for i, t in enumerate(titles) if "Output" in t)
+        ghost_idx = next(i for i, t in enumerate(titles) if "GhostTrace" in t)
+        assert output_idx < ghost_idx, "Output must be rendered before post-command ghost commentary"
+
+
+def test_full_command_lifecycle_with_ollama_whisper():
+    """Verify full command lifecycle invokes local Ollama with execution context when online."""
+    config = GhostConfig(offline_only=False, animations_enabled=False)
+    shell = HauntedShell(config)
+
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.return_value = (
+        "[Whisper] The directory exhales its secrets into the light.\n"
+        "[Explanation] Lists directory contents.\n"
+        "[Risk Warning] None"
+    )
+    shell.ghost.client = mock_client
+    shell.ghost.config.offline_only = False
+
+    mock_res = ExecutionResult(
+        stdout="vault.key\ncrypt.db",
+        stderr="",
+        returncode=0,
+        duration_ms=15.0,
+        executed=True,
+    )
+
+    with patch.object(shell.runner, "execute", return_value=mock_res) as mock_exec, patch.object(
+        shell.console, "print"
+    ) as mock_print:
+        shell.handle_input("ls")
+        mock_exec.assert_called_once()
+        mock_client.generate.assert_called_once()
+
+        # Verify Ollama received execution outcome
+        call_prompt = mock_client.generate.call_args[1]["prompt"]
+        assert "Execution status: succeeded (exit code 0)" in call_prompt
+        assert "vault.key" in call_prompt
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        renderables = [str(getattr(p, "renderable", "")) for p in panels]
+
+        assert any("Ollama" in t for t in titles)
+        assert any("The directory exhales its secrets" in r for r in renderables)
+
+
+def test_full_command_lifecycle_blocked_command_never_executes(shell: HauntedShell):
+    """Verify that a blocked command goes through safety rejection without execution or output panels."""
+    with patch.object(shell.runner, "execute") as mock_exec, patch.object(shell.console, "print") as mock_print:
+        shell.handle_input("rm -rf /")
+
+        # 1. Runner never invoked
+        mock_exec.assert_not_called()
+
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+
+        # 2. Refusal rendered, output never rendered
+        assert any("EXECUTION REFUSED BY SAFETY WARDS" in t for t in titles)
+        assert not any("Output" in t for t in titles)
+
+
+def test_full_command_lifecycle_conversational_input(shell: HauntedShell):
+    """Verify conversational inputs route to conversation handler without touching runner."""
+    with patch.object(shell.runner, "execute") as mock_exec, patch.object(shell.console, "print") as mock_print:
+        shell.handle_input("tell me a scary story")
+
+        mock_exec.assert_not_called()
+        panels = [c.args[0] for c in mock_print.call_args_list if c.args and hasattr(c.args[0], "title")]
+        titles = [str(p.title) for p in panels]
+        assert any("GHOST CONVERSATION" in t for t in titles)
+        assert not any("Output" in t for t in titles)
+
 
 
 

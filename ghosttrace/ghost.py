@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from ghosttrace.command_runner import ExecutionResult
 from ghosttrace.config import DEFAULT_MODEL, GhostConfig
 from ghosttrace.ollama_client import (
     OllamaClient,
@@ -135,13 +136,18 @@ class GhostEngine:
             timeout=config.timeout_seconds,
         )
 
-    def whisper(self, command: str, report: SafetyReport) -> GhostWhisper:
+    def whisper(
+        self,
+        command: str,
+        report: SafetyReport,
+        result: Optional[ExecutionResult] = None,
+    ) -> GhostWhisper:
         """Generate eerie commentary, explanation, and risk assessment for a command."""
         start_time = time.perf_counter()
 
         # If offline_only is enabled in config, immediately provide a deterministic spectral echo
         if self.config.offline_only:
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             latency = (time.perf_counter() - start_time) * 1000.0
             formatted_text = self._format_triad(echo, expl, risk_warn)
             return GhostWhisper(
@@ -160,7 +166,7 @@ class GhostEngine:
         # 2. Avoids unnecessary CPU/GPU processing for prohibited commands.
         # 3. Guarantees zero risk of LLM hallucinations or confusing approval messages.
         if report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED):
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             latency = (time.perf_counter() - start_time) * 1000.0
             formatted_text = self._format_triad(echo, expl, risk_warn)
             return GhostWhisper(
@@ -176,7 +182,7 @@ class GhostEngine:
 
         # Build prompt for local Ollama chat endpoint
         system_prompt = self.config.get_system_prompt()
-        user_prompt = self._build_prompt(command, report)
+        user_prompt = self._build_prompt(command, report, result=result)
 
         try:
             commentary = self.client.generate(
@@ -202,7 +208,7 @@ class GhostEngine:
                 )
 
             # If model returned empty string, fall back to deterministic echo
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -216,7 +222,7 @@ class GhostEngine:
 
         except OllamaModelNotFoundError as err:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -229,7 +235,7 @@ class GhostEngine:
             )
         except OllamaTimeoutError:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -242,7 +248,7 @@ class GhostEngine:
             )
         except OllamaConnectionError:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -255,7 +261,7 @@ class GhostEngine:
             )
         except OllamaResponseError as err:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -268,7 +274,7 @@ class GhostEngine:
             )
         except Exception as err:
             latency = (time.perf_counter() - start_time) * 1000.0
-            echo, expl, risk_warn = self._spectral_fallback_triad(command, report)
+            echo, expl, risk_warn = self._spectral_fallback_triad(command, report, result=result)
             return GhostWhisper(
                 text=self._format_triad(echo, expl, risk_warn),
                 source="spectral_echo",
@@ -280,24 +286,45 @@ class GhostEngine:
                 risk_warning=risk_warn,
             )
 
-    def _build_prompt(self, command: str, report: SafetyReport) -> str:
+    def _build_prompt(
+        self,
+        command: str,
+        report: SafetyReport,
+        result: Optional[ExecutionResult] = None,
+    ) -> str:
         """Construct the prompt sent to Ollama, treating input as untrusted."""
         safe_cmd = command.replace("\n", " ").replace('"', "'")[:100]
+        prompt_parts = [
+            f"Command entered: \"{safe_cmd}\"",
+            f"Technical function: {report.explanation}",
+            f"Safety evaluation: {report.risk_level.value} ({report.reason})",
+        ]
+        if result is not None:
+            status = "succeeded (exit code 0)" if result.returncode == 0 else f"failed (exit code {result.returncode})"
+            prompt_parts.append(f"Execution status: {status} in {result.duration_ms:.1f}ms")
+            if result.stdout:
+                snippet = result.stdout.strip().replace("\n", " ")[:120]
+                prompt_parts.append(f"Command output snippet: \"{snippet}\"")
+            elif result.stderr:
+                snippet = result.stderr.strip().replace("\n", " ")[:120]
+                prompt_parts.append(f"Command error snippet: \"{snippet}\"")
+
+        body = "\n".join(prompt_parts)
         return (
-            f"Command entered: \"{safe_cmd}\"\n"
-            f"Technical function: {report.explanation}\n"
-            f"Safety evaluation: {report.risk_level.value} ({report.reason})\n\n"
+            f"{body}\n\n"
             "Format your response as:\n"
-            "[Whisper] <1-2 sentences of eerie or humorous commentary relating directly to this command>\n"
+            "[Whisper] <1-2 sentences of eerie or humorous commentary relating directly to this command and its outcome>\n"
             "[Explanation] <1 accurate sentence explaining what the command does>\n"
             "[Risk Warning] <risk warning if warranted, otherwise 'None'>\n\n"
             "Style guidance:\n"
-            "- For 'ls': express curiosity about what is hidden in the directory.\n"
+            "- For 'ls' or 'dir': express curiosity about what is hidden in the directory or files revealed.\n"
             "- For 'git status': eerie comment on uncommitted or lingering changes.\n"
             "- For 'python': playful warning about awakening another process.\n"
+            "- For completed commands: whisper atmospheric commentary on the execution outcome.\n"
+            "- For failed commands: eerie remark on the process termination or resistance.\n"
             "- For 'rm' or destructive commands: serious warning about irreversible data loss.\n"
             "- For unknown or blocked commands: an atmospheric but honest response.\n"
-            "- Never invent command output or claim execution happened."
+            "- Never invent command output or claim unauthorized execution happened."
         )
 
     def _clean_commentary(self, text: str) -> str:
@@ -332,7 +359,12 @@ class GhostEngine:
             f"[Risk Warning] {risk_warning}"
         )
 
-    def _spectral_fallback_triad(self, command: str, report: SafetyReport) -> tuple[str, str, str]:
+    def _spectral_fallback_triad(
+        self,
+        command: str,
+        report: SafetyReport,
+        result: Optional[ExecutionResult] = None,
+    ) -> tuple[str, str, str]:
         """Generate deterministic triad when local LLM is offline or times out."""
         cmd_lower = command.strip().lower()
         parts = cmd_lower.split()
@@ -348,6 +380,13 @@ class GhostEngine:
             else:
                 pool = SPECTRAL_ECHOES["blocked_destructive"]
             risk = f"BLOCKED: {report.reason}"
+        elif result is not None and result.returncode != 0:
+            pool = [
+                f"A dissonant chill ripples through the shell... the command failed with exit code {result.returncode}.",
+                f"The process faltered and returned exit code {result.returncode}. An unseen resistance lingers in the system.",
+                f"Failure echoes in the silicon registers. Exit code {result.returncode} registered in the dark.",
+            ]
+            risk = f"Execution failed (code {result.returncode})"
         elif base_cmd in ("python", "python3"):
             pool = SPECTRAL_ECHOES["python_process"]
             risk = f"SENSITIVE: {report.reason}"

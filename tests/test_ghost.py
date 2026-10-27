@@ -384,3 +384,68 @@ def test_model_output_cannot_change_blocked_decision():
     assert report.is_allowed is False
 
 
+def test_whisper_includes_execution_result_in_prompt():
+    """Verify that execution status and output snippets are included in Ollama prompt for completed commands."""
+    from ghosttrace.command_runner import ExecutionResult
+    from ghosttrace.safety import SafetyReport
+
+    config = GhostConfig(offline_only=False)
+    mock_client = MagicMock(spec=OllamaClient)
+    mock_client.generate.return_value = "[Whisper] The files stir in the crypt.\n[Explanation] Lists files.\n[Risk Warning] None"
+    engine = GhostEngine(config=config, client=mock_client)
+
+    report = SafetyReport(
+        raw_command="ls",
+        risk_level=RiskLevel.SAFE,
+        is_allowed=True,
+        requires_confirmation=False,
+        reason="Approved",
+        explanation="Lists directory contents",
+    )
+    result = ExecutionResult(
+        stdout="phantom.txt\nspecter.py",
+        stderr="",
+        returncode=0,
+        duration_ms=4.2,
+        executed=True,
+    )
+
+    whisper = engine.whisper("ls", report, result=result)
+
+    mock_client.generate.assert_called_once()
+    prompt_arg = mock_client.generate.call_args[1]["prompt"]
+    assert "Execution status: succeeded (exit code 0)" in prompt_arg
+    assert "phantom.txt" in prompt_arg
+    assert whisper.commentary == "The files stir in the crypt."
+
+
+def test_whisper_fallback_on_failed_command_includes_exit_code():
+    """Verify that deterministic fallback for failed commands captures exit code."""
+    from ghosttrace.command_runner import ExecutionResult
+    from ghosttrace.safety import SafetyReport
+
+    config = GhostConfig(offline_only=True)
+    engine = GhostEngine(config=config)
+
+    report = SafetyReport(
+        raw_command="cat nonexistent.txt",
+        risk_level=RiskLevel.SAFE,
+        is_allowed=True,
+        requires_confirmation=False,
+        reason="Approved",
+        explanation="Reads file",
+    )
+    result = ExecutionResult(
+        stdout="",
+        stderr="No such file",
+        returncode=1,
+        duration_ms=2.0,
+        executed=True,
+    )
+
+    whisper = engine.whisper("cat nonexistent.txt", report, result=result)
+    assert whisper.source == "spectral_echo"
+    assert "exit code 1" in whisper.commentary.lower()
+
+
+

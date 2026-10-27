@@ -321,7 +321,7 @@ class HauntedShell:
             self.console.print("[dim italic]Analysis complete. Command was not executed (dry-run explain mode).[/dim italic]\n")
 
     def execute_command_pipeline(self, raw_command: str) -> None:
-        """Analyze, whisper, verify confirmation, and execute the command safely."""
+        """Analyze, execute safely, and whisper eerie post-command commentary."""
         # 1. Deterministic safety analysis
         report = self.safety.analyze(raw_command)
         is_blocked = report.risk_level in (RiskLevel.BLOCKED, RiskLevel.MALFORMED)
@@ -329,12 +329,10 @@ class HauntedShell:
         # 2. Render technical explanation & risk level
         self._render_technical_analysis(report)
 
-        # 3. Generate and render the Ghost AI commentary
-        whisper = self.ghost.whisper(raw_command, report)
-        self._render_ghost_whisper(whisper, is_blocked=is_blocked)
-
-        # 4. Handle BLOCKED or MALFORMED commands
+        # 3. Handle BLOCKED or MALFORMED commands
         if is_blocked:
+            whisper = self.ghost.whisper(raw_command, report)
+            self._render_ghost_whisper(whisper, is_blocked=True)
             self.console.print(
                 Panel(
                     f"[bold red]Refused by safety wards:[/bold red] {report.reason}\n"
@@ -347,7 +345,7 @@ class HauntedShell:
             )
             return
 
-        # 5. Handle SENSITIVE commands requiring explicit user confirmation
+        # 4. Handle SENSITIVE commands requiring explicit user confirmation
         if report.requires_confirmation and self.config.require_confirmation:
             confirm = self.console.input(
                 f"[bold yellow]⚠️  Sensitive operation detected ({report.reason})[/bold yellow]\n"
@@ -358,11 +356,15 @@ class HauntedShell:
                 self.console.print("[dim italic]Execution aborted by user. The ghost smiles from the shadows.[/dim italic]\n")
                 return
 
-        # 6. Execute through CommandRunner with shell=False
+        # 5. Execute through CommandRunner with shell=False
         result = self.runner.execute(report)
 
-        # 7. Render output
+        # 6. Render command output and exit status
         self._render_execution_result(result)
+
+        # 7. Generate and render automatic post-command eerie AI commentary
+        whisper = self.ghost.whisper(raw_command, report, result=result)
+        self._render_ghost_whisper(whisper, is_blocked=False)
 
     def _render_ghost_conversation(self, whisper: GhostWhisper) -> None:
         """Render conversational ghost response with distinct GHOST CONVERSATION heading."""
