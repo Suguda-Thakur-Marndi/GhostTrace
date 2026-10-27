@@ -1,4 +1,4 @@
-"""Entry point for GhostTrace AI haunted terminal."""
+"""Entry point for GhostTrace haunted terminal."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         prog="ghosttrace",
-        description="GhostTrace AI - Spooky, privacy-first haunted terminal with local AI commentary.",
+        description="GhostTrace - Spooky, privacy-first haunted terminal with local AI commentary.",
     )
     parser.add_argument(
         "--model",
@@ -80,7 +80,7 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         "--version",
         "-v",
         action="version",
-        version=f"GhostTrace AI v{__version__}",
+        version=f"GhostTrace v{__version__}",
     )
     return parser.parse_args(args)
 
@@ -90,7 +90,7 @@ def run_health_check(config: GhostConfig, no_color: Optional[bool] = None) -> in
     """Perform non-interactive diagnostic inspection."""
     console = Console(legacy_windows=False, no_color=no_color)
 
-    console.print(f"[bold magenta]GhostTrace AI v{__version__} — Diagnostics[/bold magenta]")
+    console.print(f"[bold magenta]GhostTrace v{__version__} — Diagnostics[/bold magenta]")
 
     client = OllamaClient(host=config.ollama_url, timeout=3.0)
     is_alive = client.is_available()

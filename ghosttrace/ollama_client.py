@@ -77,7 +77,7 @@ class OllamaClient:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "GhostTrace/0.1.0"})
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                raw_data = resp.read().decode("utf-8")
+                raw_data = resp.read().decode("utf-8", errors="replace")
                 try:
                     data = json.loads(raw_data)
                 except Exception as err:
@@ -135,7 +135,7 @@ class OllamaClient:
 
         try:
             with urllib.request.urlopen(req, timeout=to) as resp:
-                raw_text = resp.read().decode("utf-8")
+                raw_text = resp.read().decode("utf-8", errors="replace")
                 try:
                     result = json.loads(raw_text)
                 except json.JSONDecodeError as err:

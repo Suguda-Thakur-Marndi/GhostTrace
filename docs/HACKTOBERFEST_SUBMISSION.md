@@ -1,6 +1,6 @@
 # Hacktoberfest 2026 — Week 3 Submission: "Ghost in the Machine" 👻🎃
 
-**Project Title:** GhostTrace AI — The Haunted, Privacy-First Terminal  
+**Project Title:** GhostTrace — The Haunted, Privacy-First Terminal  
 **Repository:** [https://github.com/PLACEHOLDER_USER/GhostTrace](https://github.com/PLACEHOLDER_USER/GhostTrace)  
 **Demo Video:** [https://youtu.be/PLACEHOLDER_DEMO_LINK](https://youtu.be/PLACEHOLDER_DEMO_LINK)  
 **Author / Team:** GhostTrace Contributors  
@@ -9,9 +9,9 @@
 
 ---
 
-## 👻 1. What GhostTrace AI Does
+## 👻 1. What GhostTrace Does
 
-GhostTrace AI brings the theme **"Ghost in the Machine"** to life as an atmospheric, Gothic-styled interactive developer terminal. It transforms the routine terminal into an eerie space haunted by an ancient digital entity that whispers cryptic commentary on your activity.
+GhostTrace brings the theme **"Ghost in the Machine"** to life as an atmospheric, Gothic-styled interactive developer terminal. It transforms the routine terminal into an eerie space haunted by an ancient digital entity that whispers cryptic commentary on your activity.
 
 Under the hood, GhostTrace features a **Dual-Nature Architecture**:
 1. **The Technical Sentinel**: A deterministic cybersecurity engine that intercepts every user keystroke, classifies input into built-in commands, natural conversation, or system utilities, validates commands against a strict allowlist, and permanently blocks dangerous operations (such as `rm -rf /`, formatting disks, fork bombs, and operator chaining `&&`, `;`, `|`).
@@ -21,7 +21,7 @@ Under the hood, GhostTrace features a **Dual-Nature Architecture**:
 
 ## 🧠 2. Why Gemma 3 4B Through Ollama Makes It Open & Local-First
 
-Unlike conventional AI tools that rely on proprietary cloud APIs (such as OpenAI, Anthropic, or Google Gemini cloud endpoints), GhostTrace AI is committed to genuine **open-source AI sovereignty**:
+Unlike conventional AI tools that rely on proprietary cloud APIs (such as OpenAI, Anthropic, or Google Gemini cloud endpoints), GhostTrace is committed to genuine **open-source AI sovereignty**:
 
 - **Open Weights**: We use Google's state-of-the-art open-weight model, **Gemma 3 4B**, distributed freely via Ollama (`ollama pull gemma3:4b`).
 - **Standard Library Local Client**: GhostTrace connects to the local Ollama daemon (`http://localhost:11434/api/chat`) using a zero-dependency Python standard library client (`urllib.request`). There are no heavy proprietary SDKs or hidden tracking telemetry.
@@ -63,7 +63,7 @@ True security engineering demands honesty about limitations:
 
 ---
 
-## 🚀 6. How to Run GhostTrace AI
+## 🚀 6. How to Run GhostTrace
 
 ```powershell
 # 1. Clone & Set Up

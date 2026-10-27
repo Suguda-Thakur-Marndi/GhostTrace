@@ -1,4 +1,4 @@
-"""Configuration management for GhostTrace AI."""
+"""Configuration management for GhostTrace."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Haunted terminal REPL interface for GhostTrace AI using Rich."""
+"""Haunted terminal REPL interface for GhostTrace using Rich."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ from ghosttrace.safety import InputCategory, RiskLevel, SafetyEngine, SafetyRepo
 
 ASCII_BANNER = r"""
        .-.
-      (o.o)   [bold green]G H O S T T R A C E   A I[/bold green]
+      (o.o)   [bold green]G H O S T T R A C E[/bold green]
        |=|    [dim]─────────────────────────────────────────────────[/dim]
-      /   \   [bold green]GHOSTTRACE AI — THE SHELL REMEMBERS[/bold green]
+      /   \   [bold green]GHOSTTRACE — THE SHELL REMEMBERS[/bold green]
      (:   :)  [dim]Local AI Engine • Privacy-First • Zero Cloud Telemetry[/dim]
       `"`"`
 """
@@ -199,7 +199,7 @@ class HauntedShell:
 
     def cmd_help(self) -> None:
         """Display the haunted terminal grimoire."""
-        table = Table(title="[bold green]GHOSTTRACE AI — THE GRIMOIRE[/bold green]", box=box.ROUNDED)
+        table = Table(title="[bold green]GHOSTTRACE — THE GRIMOIRE[/bold green]", box=box.ROUNDED)
         table.add_column("Command", style="green bold", width=22)
         table.add_column("Description", style="white")
 
@@ -424,10 +424,10 @@ class HauntedShell:
         notice = f"\n[dim red]Notice: {whisper.error_notice}[/dim red]" if whisper.error_notice else ""
 
         if is_blocked:
-            panel_title = f"[bold red]👻 GhostTrace AI • Passive Text Explanation (Not Executed)[/bold red] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
+            panel_title = f"[bold red]👻 GhostTrace • Passive Text Explanation (Not Executed)[/bold red] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
             border_style = "red"
         else:
-            panel_title = f"[bold green]👻 GhostTrace AI[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
+            panel_title = f"[bold green]👻 GhostTrace[/bold green] [dim]•[/dim] {source_badge} [dim]•[/dim] {latency}"
             border_style = "green"
 
         if whisper.commentary and whisper.explanation:

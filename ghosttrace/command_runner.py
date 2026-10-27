@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import datetime
 import getpass
+import locale
 import os
 import shutil
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from ghosttrace.safety import RiskLevel, SafetyReport
 
@@ -273,6 +274,34 @@ class CommandRunner:
             executed=True,
         )
 
+    @staticmethod
+    def _safe_decode(data: Union[bytes, str, None]) -> str:
+        """Safely decode process output without raising UnicodeDecodeError.
+
+        Tries UTF-8 first, falls back to the system's preferred encoding
+        (e.g., Windows CP1252 / OEM codepages), and lastly falls back to UTF-8
+        with errors='replace' to guarantee no crashes on arbitrary binary bytes.
+        """
+        if data is None:
+            return ""
+        if isinstance(data, str):
+            return data
+        if isinstance(data, (bytes, bytearray)):
+            try:
+                return data.decode("utf-8")
+            except UnicodeDecodeError:
+                pass
+
+            try:
+                enc = locale.getpreferredencoding(False)
+                if enc and enc.lower().replace("-", "") not in ("utf8", "utf_8"):
+                    return data.decode(enc)
+            except Exception:
+                pass
+
+            return data.decode("utf-8", errors="replace")
+        return str(data)
+
     def _execute_process(self, args: List[str], start_time: float) -> ExecutionResult:
         """Execute binary with shell=False and strict timeout."""
         executable = shutil.which(args[0])
@@ -293,22 +322,26 @@ class CommandRunner:
                 cmd_list,
                 shell=False,  # CRITICAL: shell=False prevents shell injection
                 capture_output=True,
-                text=True,
+                text=False,  # Capture raw bytes to prevent reader thread decoding crashes on Windows
                 timeout=self.timeout,
             )
             duration = (time.perf_counter() - start_time) * 1000.0
             return ExecutionResult(
-                stdout=proc.stdout or "",
-                stderr=proc.stderr or "",
+                stdout=self._safe_decode(proc.stdout),
+                stderr=self._safe_decode(proc.stderr),
                 returncode=proc.returncode,
                 duration_ms=duration,
                 executed=True,
             )
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
             duration = (time.perf_counter() - start_time) * 1000.0
+            captured_stdout = self._safe_decode(getattr(exc, "stdout", None))
+            captured_stderr = self._safe_decode(getattr(exc, "stderr", None))
+            timeout_msg = f"Process execution timed out after {self.timeout} seconds."
+            full_stderr = f"{captured_stderr}\n{timeout_msg}".strip() if captured_stderr else timeout_msg
             return ExecutionResult(
-                stdout="",
-                stderr=f"Process execution timed out after {self.timeout} seconds.",
+                stdout=captured_stdout,
+                stderr=full_stderr,
                 returncode=124,
                 duration_ms=duration,
                 executed=True,

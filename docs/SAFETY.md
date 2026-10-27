@@ -1,8 +1,8 @@
-# GhostTrace AI — Security Architecture & Safety Policy 🛡️👻
+# GhostTrace — Security Architecture & Safety Policy 🛡️👻
 
 ## 1. Executive Summary & Security Notice
 
-**GhostTrace AI** combines a local Large Language Model (**Gemma 3 4B** via Ollama) with an interactive, atmospheric terminal experience. While the interface features Gothic horror aesthetic and spectral commentary, **the security architecture is strictly deterministic, conservative, and air-gapped from model hallucinations**.
+**GhostTrace** combines a local Large Language Model (**Gemma 3 4B** via Ollama) with an interactive, atmospheric terminal experience. While the interface features Gothic horror aesthetic and spectral commentary, **the security architecture is strictly deterministic, conservative, and air-gapped from model hallucinations**.
 
 > [!CAUTION]
 > **NOT AN OPERATING SYSTEM SANDBOX OR HARDENED SHELL**

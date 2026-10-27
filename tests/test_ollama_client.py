@@ -220,3 +220,31 @@ def test_unsupported_scheme_rejected():
         OllamaClient(host="ftp://localhost:11434")
     assert "Unsupported URI scheme" in str(exc_info.value)
 
+
+def test_chat_handles_invalid_utf8_in_response(client: OllamaClient):
+    """Verify chat handles non-UTF-8 bytes in HTTP response body safely using replacement."""
+    raw_payload = b'{"message": {"content": "ghost \x8f whisper"}}'
+    mock_enter = MagicMock()
+    mock_enter.read.return_value = raw_payload
+    mock_enter.__enter__.return_value = mock_enter
+
+    with patch("urllib.request.urlopen", return_value=mock_enter):
+        content = client.chat(messages=[{"role": "user", "content": "Hello"}])
+        assert "ghost " in content
+        assert " whisper" in content
+        assert "\ufffd" in content
+
+
+def test_list_models_handles_invalid_utf8_in_response(client: OllamaClient):
+    """Verify list_models handles non-UTF-8 bytes in tags response body safely using replacement."""
+    raw_payload = b'{"models": [{"name": "gemma3:4b\x8f"}]}'
+    mock_enter = MagicMock()
+    mock_enter.read.return_value = raw_payload
+    mock_enter.__enter__.return_value = mock_enter
+
+    with patch("urllib.request.urlopen", return_value=mock_enter):
+        models = client.list_models()
+        assert len(models) == 1
+        assert "gemma3:4b" in models[0]
+
+

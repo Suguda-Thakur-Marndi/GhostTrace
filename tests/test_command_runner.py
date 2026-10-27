@@ -171,3 +171,112 @@ def test_subprocess_timeout_handling(runner: CommandRunner):
             assert result.executed
             assert result.returncode == 124
             assert "timed out" in result.stderr
+
+
+def test_safe_decode_handles_all_encodings():
+    """Verify CommandRunner._safe_decode handles UTF-8, CP1252, invalid bytes, None, and strings."""
+    # None and str
+    assert CommandRunner._safe_decode(None) == ""
+    assert CommandRunner._safe_decode("already_string") == "already_string"
+
+    # Valid UTF-8
+    utf8_bytes = "GhostTrace 👻".encode("utf-8")
+    assert CommandRunner._safe_decode(utf8_bytes) == "GhostTrace 👻"
+
+    # Valid CP1252 (e.g. 0xe9 is 'é')
+    cp1252_bytes = b"caf\xe9"
+    decoded_cp1252 = CommandRunner._safe_decode(cp1252_bytes)
+    assert "caf" in decoded_cp1252
+
+    # Byte 0x8f (the specific byte causing charmap crash on Windows cp1252)
+    bad_bytes = b"echo \x8f test"
+    decoded_bad = CommandRunner._safe_decode(bad_bytes)
+    assert "echo " in decoded_bad
+    assert " test" in decoded_bad
+    assert "\ufffd" in decoded_bad  # Replaced gracefully
+
+    # Mixed invalid bytes
+    arbitrary_bytes = b"\xff\xfe\x8f\x80\xc0"
+    decoded_arbitrary = CommandRunner._safe_decode(arbitrary_bytes)
+    assert isinstance(decoded_arbitrary, str)
+    assert len(decoded_arbitrary) > 0
+
+
+def test_subprocess_execution_with_invalid_encoding_bytes(runner: CommandRunner):
+    """Ensure subprocess execution safely decodes output with byte 0x8f and does not crash."""
+    dummy_report = SafetyReport(
+        raw_command="test-cmd",
+        risk_level=RiskLevel.SAFE,
+        is_allowed=True,
+        requires_confirmation=False,
+        reason="Approved",
+        parsed_args=["test-cmd"],
+        explanation="Testing binary output",
+    )
+
+    mock_proc = MagicMock()
+    mock_proc.stdout = b"phantom \x8f stdout"
+    mock_proc.stderr = b"spectral \x8f stderr"
+    mock_proc.returncode = 0
+
+    with patch("shutil.which", return_value="C:\\Bin\\test-cmd.exe"):
+        with patch("subprocess.run", return_value=mock_proc) as mock_run:
+            result = runner.execute(dummy_report)
+            assert result.executed
+            assert result.returncode == 0
+            assert "phantom " in result.stdout
+            assert "spectral " in result.stderr
+            assert "\ufffd" in result.stdout
+            assert "\ufffd" in result.stderr
+
+            mock_run.assert_called_once()
+            _, kwargs = mock_run.call_args
+            assert kwargs.get("text") is False
+            assert kwargs.get("shell") is False
+
+
+def test_subprocess_timeout_with_raw_bytes(runner: CommandRunner):
+    """Ensure subprocess timeout safely decodes byte output present on TimeoutExpired."""
+    dummy_report = SafetyReport(
+        raw_command="python long_task.py",
+        risk_level=RiskLevel.SENSITIVE,
+        is_allowed=True,
+        requires_confirmation=True,
+        reason="Sensitive",
+        parsed_args=["python", "long_task.py"],
+        explanation="Long running task",
+    )
+
+    exc = subprocess.TimeoutExpired(cmd=["python"], timeout=5.0)
+    exc.stdout = b"partial stdout \x8f"
+    exc.stderr = b"partial stderr \x8f"
+
+    with patch("shutil.which", return_value="C:\\Python\\python.exe"):
+        with patch("subprocess.run", side_effect=exc):
+            result = runner.execute(dummy_report)
+            assert result.executed
+            assert result.returncode == 124
+            assert "partial stdout " in result.stdout
+            assert "partial stderr " in result.stderr
+            assert "timed out" in result.stderr
+
+
+def test_real_subprocess_execution_with_byte_0x8f(runner: CommandRunner):
+    """End-to-end regression test: execute actual Python process outputting raw byte 0x8f."""
+    import sys
+    import time
+
+    code = (
+        "import sys; "
+        "sys.stdout.buffer.write(b'real_out_\\x8f_done\\n'); "
+        "sys.stdout.buffer.flush(); "
+        "sys.stderr.buffer.write(b'real_err_\\x8f_done\\n'); "
+        "sys.stderr.buffer.flush()"
+    )
+    result = runner._execute_process([sys.executable, "-c", code], time.perf_counter())
+
+    assert result.executed is True
+    assert result.returncode == 0
+    assert "real_out_" in result.stdout
+    assert "real_err_" in result.stderr
+

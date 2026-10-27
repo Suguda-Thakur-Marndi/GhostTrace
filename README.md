@@ -1,4 +1,4 @@
-# GhostTrace AI 👻⚡
+# GhostTrace 👻⚡
 ### *The Shell Remembers. Every keystroke leaves an echo in the machine.*
 
 [![Hacktoberfest 2026](https://img.shields.io/badge/Hacktoberfest-2026%20Week%203-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com/)
@@ -7,25 +7,25 @@
 [![Tests: 214 Passing](https://img.shields.io/badge/Tests-214%20Passing-brightgreen?style=for-the-badge)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-**GhostTrace AI** is a spooky, privacy-first haunted terminal that analyzes shell commands, verifies their safety through deterministic wards, and whispers eerie AI-generated commentary using a 100% locally running open-weight language model (**`gemma3:4b`** via [Ollama](https://ollama.com/)).
+**GhostTrace** is a spooky, privacy-first haunted terminal that analyzes shell commands, verifies their safety through deterministic wards, and whispers eerie AI-generated commentary using a 100% locally running open-weight language model (**`gemma3:4b`** via [Ollama](https://ollama.com/)).
 
 Built for **Hacktoberfest 2026 — Week 3: Ghost in the Machine**, GhostTrace demonstrates that atmospheric Gothic horror, conversational AI, and conservative cybersecurity engineering can coexist seamlessly at the command line.
 
 > [!CAUTION]
 > **NOT AN OPERATING SYSTEM SANDBOX OR HARDENED SHELL**
-> GhostTrace AI is an interactive developer tool, cybersecurity demonstration, and atmospheric terminal companion. It enforces strict deterministic parsing, allowlists, and execution filters prior to invoking system utilities. **It is NOT a kernel-level security sandbox, hypervisor, or container (such as seccomp, AppArmor, or Docker).** Commands permitted by the allowlist or authorized through user confirmation run with the current user's operating system privileges. Never run untrusted scripts or approve sensitive commands without manual verification. See [docs/SAFETY.md](docs/SAFETY.md) for full details.
+> GhostTrace is an interactive developer tool, cybersecurity demonstration, and atmospheric terminal companion. It enforces strict deterministic parsing, allowlists, and execution filters prior to invoking system utilities. **It is NOT a kernel-level security sandbox, hypervisor, or container (such as seccomp, AppArmor, or Docker).** Commands permitted by the allowlist or authorized through user confirmation run with the current user's operating system privileges. Never run untrusted scripts or approve sensitive commands without manual verification. See [docs/SAFETY.md](docs/SAFETY.md) for full details.
 
 ---
 
 ## 🔮 Dual-Nature Response Architecture
 
-GhostTrace AI provides two distinct perspectives for every interaction:
+GhostTrace provides two distinct perspectives for every interaction:
 1. **The Technical Sentinel (Factual & Safe)**: Deterministically analyzes syntax, explains what the command does, assigns a risk classification (`SAFE`, `SENSITIVE`, `BLOCKED`, `MALFORMED`), and prompts for user confirmation (`[y/N]`) before executing state-modifying actions.
 2. **The Spectral Inhabitant (Atmospheric & Spooky)**: Whispers cryptic, chilling commentary generated in real-time by a local language model (`gemma3:4b`) or the deterministic "Spectral Echoes" offline library.
 
 ```
        .-.
-      (o.o)   G H O S T T R A C E   A I
+      (o.o)   G H O S T T R A C E
        |=|    ─────────────────────────────────────────────────
       /   \   "The Shell Remembers. Every keystroke leaves an echo."
      (:   :)  Local AI Engine • Privacy-First • Zero Cloud Telemetry
@@ -113,7 +113,7 @@ flowchart TD
 
 ## 💻 Tested Platform
 
-GhostTrace AI is engineered and tested for:
+GhostTrace is engineered and tested for:
 - **Operating System**: Windows 11 (64-bit)
 - **Shells**: PowerShell 7+, Windows Terminal, Command Prompt (`cmd.exe`)
 - **Python**: Python 3.11 or 3.12
@@ -370,7 +370,7 @@ GhostTrace comes with an extensive automated test suite covering safety parsing,
 
 ## 🤝 Contributing Guidelines
 
-Contributions to GhostTrace AI are warmly welcomed for Hacktoberfest 2026!
+Contributions to GhostTrace are warmly welcomed for Hacktoberfest 2026!
 
 1. **Fork & Branch**: Create your feature branch (`git checkout -b feature/spectral-enhancement`).
 2. **Follow Security Baseline**:

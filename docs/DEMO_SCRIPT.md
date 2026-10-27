@@ -1,6 +1,6 @@
-# GhostTrace AI — 60–90 Second Terminal Demo Script 🎬👻
+# GhostTrace — 60–90 Second Terminal Demo Script 🎬👻
 
-This script provides an exact, step-by-step walkthrough for recording a 60–90 second demonstration video or live presentation of GhostTrace AI for **Hacktoberfest 2026 — Week 3: Ghost in the Machine**.
+This script provides an exact, step-by-step walkthrough for recording a 60–90 second demonstration video or live presentation of GhostTrace for **Hacktoberfest 2026 — Week 3: Ghost in the Machine**.
 
 ---
 
@@ -25,7 +25,7 @@ This script provides an exact, step-by-step walkthrough for recording a 60–90 
 python -m ghosttrace.main
 ```
 **Presenter Narration:**
-> *"Welcome to GhostTrace AI — a haunted, privacy-first developer terminal built for Hacktoberfest 2026. Every keystroke is monitored by a local language model, Gemma 3 4B running on device via Ollama, combined with deterministic security wards."*
+> *"Welcome to GhostTrace — a haunted, privacy-first developer terminal built for Hacktoberfest 2026. Every keystroke is monitored by a local language model, Gemma 3 4B running on device via Ollama, combined with deterministic security wards."*
 
 ---
 
@@ -110,7 +110,7 @@ ghost@machine:GhostTrace 👻❯ dir
 ```
 **Expected Output:**
 ```
-╭───────── 👻 GhostTrace AI • Spectral Echo (Offline/Fallback) • 0ms ──────────╮
+╭───────── 👻 GhostTrace • Spectral Echo (Offline/Fallback) • 0ms ──────────╮
 │ Ghost Commentary: "A cold wind rustles through the file tree. Each byte is a │
 │ tombstone."                                                                  │
 │ Notice: Offline mode active (deterministic spectral voice).                  │
