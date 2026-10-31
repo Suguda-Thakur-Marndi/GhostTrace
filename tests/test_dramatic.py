@@ -111,6 +111,62 @@ class TestDramaticEventsAndRateLimiting(unittest.TestCase):
             )
             self.assertTrue(should_run)
 
+    @patch("ghostd.datetime.datetime")
+    def test_zero_chance_skips_even_at_midnight(self, mock_datetime):
+        # Midnight hours must never override an explicit 0% chance
+        mock_now = MagicMock()
+        mock_now.hour = 2
+        mock_datetime.now.return_value = mock_now
+
+        pipe = WhisperPipeline(chance=0, offline=True)
+        should_run, is_dramatic, reason = pipe.should_whisper(
+            cmd="ls",
+            args="",
+            exit_status=0,
+            session_count=1,
+        )
+        self.assertFalse(should_run)
+        self.assertFalse(is_dramatic)
+        self.assertEqual(reason, "skipped_chance")
+
+    def test_hundred_chance_allows_normal_command(self):
+        # 100% chance allows all eligible normal commands
+        pipe = WhisperPipeline(chance=100, offline=True)
+        should_run, is_dramatic, reason = pipe.should_whisper(
+            cmd="ls",
+            args="",
+            exit_status=0,
+            session_count=1,
+        )
+        self.assertTrue(should_run)
+        self.assertFalse(is_dramatic)
+        self.assertEqual(reason, "chance_roll")
+
+    def test_chance_clamping_and_validation(self):
+        # Negative chance is clamped to 0 (skips normal commands)
+        pipe_neg = WhisperPipeline(chance=-20, offline=True)
+        self.assertEqual(pipe_neg.chance, 0)
+        should_run, _, reason = pipe_neg.should_whisper(
+            cmd="ls",
+            args="",
+            exit_status=0,
+            session_count=1,
+        )
+        self.assertFalse(should_run)
+        self.assertEqual(reason, "skipped_chance")
+
+        # Chance > 100 is clamped to 100 (allows normal commands)
+        pipe_high = WhisperPipeline(chance=150, offline=True)
+        self.assertEqual(pipe_high.chance, 100)
+        should_run, _, reason = pipe_high.should_whisper(
+            cmd="ls",
+            args="",
+            exit_status=0,
+            session_count=1,
+        )
+        self.assertTrue(should_run)
+        self.assertEqual(reason, "chance_roll")
+
 
 class TestSessionStateAndForget(unittest.TestCase):
     """Tests for minimal session tracking and the forget command."""

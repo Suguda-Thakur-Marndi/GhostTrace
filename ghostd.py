@@ -646,7 +646,10 @@ class WhisperPipeline:
                 DEFAULT_OLLAMA_ENDPOINT if self.provider == "ollama" else DEFAULT_LLAMACPP_ENDPOINT
             )
         self.timeout = timeout
-        self.chance = max(0, min(chance, 100))
+        try:
+            self.chance = max(0, min(int(chance), 100))
+        except (ValueError, TypeError):
+            self.chance = DEFAULT_CHANCE
         self.send_args = send_args
         self.offline = offline
 
@@ -683,13 +686,25 @@ class WhisperPipeline:
         if session_count == 13 or (session_count > 0 and session_count % 13 == 0):
             return True, True, "thirteenth_command"
 
+        # Ensure chance is validated and clamped between 0 and 100
+        try:
+            chance = max(0, min(int(self.chance), 100))
+        except (ValueError, TypeError):
+            chance = DEFAULT_CHANCE
+
+        # A chance of 0 disables ordinary random whispers completely
+        if chance <= 0:
+            return False, False, "skipped_chance"
+
         # Special moment: Midnight to 05:00
         hour = datetime.datetime.now().hour
         if 0 <= hour < 5:
-            # Midnight hours increase chance to at least 70%
-            effective_chance = max(self.chance, 70)
+            # Midnight hours increase active chance to at least 70%
+            effective_chance = max(chance, 70)
         else:
-            effective_chance = self.chance
+            effective_chance = chance
+
+        effective_chance = max(0, min(effective_chance, 100))
 
         # Standard chance roll
         roll = random.randint(1, 100)

@@ -14,11 +14,11 @@ This independent release-readiness audit verified the Hacktoberfest **"Ghost in 
 No working functionality was deleted, and the existing Python REPL (`ghosttrace/` package) with its 226 unit tests remains 100% intact, operational, and passing.
 
 ### Test Suite Execution Summary
-- **Python Test Suite (`python -m pytest -q`):** **287 passed, 0 failed** in 7.74s.
+- **Python Test Suite (`python -m pytest -q`):** **290 passed, 0 failed** in 8.36s.
   - REPL & Core GhostTrace Engine Tests: 226 passed.
   - Ghost Daemon (`tests/test_ghostd.py`): 28 passed.
   - Persona & Prompt Loader (`tests/test_personas.py`): 9 passed.
-  - Dramatic Events & Session State (`tests/test_dramatic.py`): 11 passed.
+  - Dramatic Events & Session State (`tests/test_dramatic.py`): 14 passed.
   - Shell Integration (`tests/test_haunt_shell.py`): 15 passed.
 - **Python Bytecode Compilation (`python -m compileall -q .`):** **Passed** (Code 0, zero syntax or bytecode errors).
 - **Shell Syntax Verification (`bash -n haunt.sh install.sh demo.sh`):** **Passed** (Code 0, clean AST validation).
@@ -31,7 +31,7 @@ No working functionality was deleted, and the existing Python REPL (`ghosttrace/
 
 | Verification Target | Command Executed | Result | Status |
 | :--- | :--- | :--- | :--- |
-| Full Pytest Suite | `python -m pytest -q` | 287 passed in 7.74s | **VERIFIED** |
+| Full Pytest Suite | `python -m pytest -q` | 290 passed in 8.36s | **VERIFIED** |
 | Bytecode Compilation | `python -m compileall -q .` | Code 0, clean | **VERIFIED** |
 | Shell Syntax Check | `bash -n haunt.sh install.sh demo.sh` | Code 0, clean | **VERIFIED** |
 | Git Whitespace/Diff Check | `git diff --check` | Code 0, clean | **VERIFIED** |
@@ -219,6 +219,9 @@ During this verification pass, six items were inspected and resolved:
 6. **Shell State Reset on `haunt forget`:**
    - *Issue:* Calling `haunt forget` wiped backend state but left `__HAUNT_PENDING_REQ` primed in memory.
    - *Fix:* Added `__HAUNT_PENDING_REQ=""` to `haunt.sh` forget handler.
+7. **Midnight Hours Overriding 0% Whisper Chance in `WhisperPipeline.should_whisper`:**
+   - *Issue:* During midnight hours (00:00 to 05:00), `effective_chance = max(self.chance, 70)` boosted a chance of 0% to 70%, violating the contract that a 0% chance completely disables ordinary random whispers.
+   - *Fix:* Clamped and validated `self.chance` between 0 and 100, and immediately returned `skipped_chance` when `chance <= 0` (while strictly preserving dramatic events and 13th-command triggers). Added regression tests in `tests/test_dramatic.py` covering midnight zero-chance, 100% chance, and value clamping.
 
 ---
 
@@ -227,7 +230,7 @@ During this verification pass, six items were inspected and resolved:
 | Release Criteria | Verification Finding | Status |
 | :--- | :--- | :--- |
 | **Original REPL & Tests Preserved** | All 226 original tests pass intact | **PASS** |
-| **New Test Suite Coverage** | 61 new tests covering daemon, personas, hooks | **PASS** (287/287) |
+| **New Test Suite Coverage** | 64 new tests covering daemon, personas, hooks | **PASS** (290/290) |
 | **Zero Compiler/Syntax Errors** | `compileall` and `bash -n` clean (Code 0) | **PASS** |
 | **Git Working Tree Hygiene** | `git diff --check` clean (Code 0) | **PASS** |
 | **Security: No Exfiltration** | Loopback-only enforced, proxies/redirects blocked | **PASS** |
